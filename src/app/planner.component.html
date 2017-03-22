@@ -1,10 +1,13 @@
 <p-growl [value]="_msgs" life=5000></p-growl>
 
-<title>Hello Plannophil</title>
-<div class="dashboard-container">
+<div id="mapid" style="width: 100%; height: 500px;"></div>
 
-	<div class="dashboard-card-large">
-		test
-	</div>
-
+<div>
+	<button (click)="generateMission()">Generate mavlink output</button>
+</div>
+<div>
+	<input class="dashboard-card-item" type="button" value="Add..." onclick="document.getElementById('selectedFile').click();"
+	/>
+	<input class="dashboard-card-item" type="file" id="selectedFile" style="display: none;" #kmzFileDialog (change)="addKmzFile(kmzFileDialog)"
+	/>
 </div>
