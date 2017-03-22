@@ -27,7 +27,7 @@ const ScriptExtHtmlWebpackPlugin = require('script-ext-html-webpack-plugin');
  */
 const AOT = helpers.hasNpmFlag('aot');
 const METADATA = {
-  title: 'Bebop Bridge Client',
+  title: 'Bebop Mission Planner',
   baseUrl: '/',
   isDevServer: helpers.isWebpackDevServer()
 };
@@ -49,7 +49,6 @@ module.exports = function (options) {
      */
     entry: {
       'polyfills': './src/app/polyfills.ts',
-      //'vendor': './src/app/vendor.ts', // added via CommonsChunkPlugin
       'app': './src/app/main.ts'
     },
 

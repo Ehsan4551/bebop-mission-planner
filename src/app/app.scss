@@ -1,0 +1,124 @@
+* {
+    font-family: Arial, Helvetica, sans-serif;
+}
+h1 {
+    font-size: 1.5em;
+    color: #369;
+    margin-bottom: 0;
+}
+h2, h3 {
+    font-size: 1.2em;
+    color: #444;
+    font-weight: lighter;
+    margin-top: 0;
+    padding-top: 0;
+}
+body {
+    margin: 2em;
+}
+nav a {
+    padding: 5px 10px;
+    text-decoration: none;
+    margin-top: 10px;
+    display: inline-block;
+    background-color: #eee;
+    border-radius: 4px;
+}
+nav a:visited, a:link {
+    color: #607D8B;
+}
+nav a:hover {
+    color: #039be5;
+    background-color: #CFD8DC;
+}
+nav a.active {
+    color: #039be5;
+}
+th, td {
+  padding: 5px;
+  text-align: center;
+}
+.controlbutton{
+    height:50;
+    width:100px;
+}
+.takeoffbutton{
+  color: white;
+  background-color: #4CAF50; 
+  height:30;
+  width:155;
+}
+.touchdownbutton{
+  color: white;
+  background-color: #f44336;
+  height:30;
+  width:155;
+}
+.connectbutton{
+  height: 30;
+  width: 320;
+}
+
+.color-box {
+    display: flex;
+    flex-direction: row;
+    margin: auto;
+    width: 80px;
+    height: 20px;
+    border-radius: 15px;
+    color: white;
+}
+
+.dashboard-container {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+.dashboard-card {
+    display: flex;
+    justify-content: space-around;
+    background: whitesmoke;
+    flex-direction: column;
+    margin: 5px 5px 5px 5px;
+    padding-top: 5px;  
+    padding-right: 15px;  
+    padding-bottom: 5px;  
+    padding-left: 15px;
+    border: 3px solid grey;
+    border-radius: 15px;
+    width: 130px;
+    height: 100px;
+    font-size: 16px;
+}
+
+.dashboard-card-large{
+     display: flex;
+    justify-content: space-around;
+    background: whitesmoke;
+    flex-direction: column;
+    margin: 5px 5px 5px 5px;
+    padding-top: 5px;  
+    padding-right: 15px;  
+    padding-bottom: 5px;  
+    padding-left: 15px;
+    border: 3px solid grey;
+    border-radius: 15px;
+    width: 400px;
+    height: 120px;
+    font-size: 16px;
+}
+
+.dashboard-card-item{
+    display: flex;
+    flex-direction: row;
+    margin: auto;
+    border-radius: 5px;
+}
+
+.label {
+    font-weight: bold;
+    background-color: #f5f5f5;
+    padding: 5px;
+}
+
+
