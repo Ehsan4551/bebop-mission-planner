@@ -1,0 +1,10 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+     "files.exclude": {
+        "src/app/*.js": {"when": "$(basename).ts"},
+        "src/app/*.js.map": true
+    }
+,
+"typescript.tsdk": "./node_modules/typescript/lib",
+"editor.minimap.enabled": true
+}
