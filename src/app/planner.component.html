@@ -2,12 +2,78 @@
 
 <div id="mapid" style="width: 100%; height: 500px;"></div>
 
-<div>
-	<button (click)="generateMission()">Generate mavlink output</button>
-</div>
-<div>
-	<input class="dashboard-card-item" type="button" value="Add..." onclick="document.getElementById('selectedFile').click();"
-	/>
-	<input class="dashboard-card-item" type="file" id="selectedFile" style="display: none;" #kmzFileDialog (change)="addKmzFile(kmzFileDialog)"
-	/>
-</div>
+<table>
+	<tr>
+		<td>
+			<input class="dashboard-card-item" type="button" value="Load Kmz ..." onclick="document.getElementById('selectedFile').click();"
+			/>
+			<input class="dashboard-card-item" type="file" id="selectedFile" style="display: none;" #kmzFileDialog (change)="addKmzFile(kmzFileDialog)"
+			/>
+		</td>
+		<td>
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="setBearingToCenter()">Center bearing</button>
+		</td>
+		<td>
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="addIntermediateWaypoints()">Add waypoints</button>
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointDistances" [(ngModel)]="this._selectedWaypointDistance"></p-dropdown> [m]
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="setBearing()">Reset bearing</button>
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._bearings" [(ngModel)]="this._selectedBearing"></p-dropdown> [deg]
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="setWaypointRadius()">Reset WP radius</button>
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointRadii" [(ngModel)]="this._selectedWaypointRadius"></p-dropdown> [m]
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="setAltitude()">Reset altitude</button>
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedAltitude"></p-dropdown> [m]
+		</td>
+	</tr>
+	<tr>
+		<td>
+			Velocity
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._velocities" [(ngModel)]="this._selectedVelocity"></p-dropdown> [m/s]
+		</td>
+		<td>
+			Hold time at WPs
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._holdTimes" [(ngModel)]="this._selectedHoldTime"></p-dropdown> [s]
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="generateMavlink()">Generate mavlink code</button>
+		</td>
+		<td>
+			
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="saveFlightplan()">Download mission</button>
+		</td>
+		<td>
+			
+		</td>
+	</tr>
+</table>
+<a style="display: none">
+</a>
