@@ -169,13 +169,13 @@ export class PlannerComponent implements OnInit {
                     try {
                         // create a name for the flight plan
                         let flightplanName: string = inputElement.files[0].name.replace(".kmz", "");
-                        let currentdate = new Date();
-                        flightplanName += "_" + currentdate.getFullYear() + '-'
-                            + (currentdate.getMonth() + 1) + "-"
-                            + currentdate.getDate() + "_"
-                            + currentdate.getHours()
-                            + currentdate.getMinutes()
-                            + currentdate.getSeconds();
+                        // let currentdate = new Date();
+                        // flightplanName += "_" + currentdate.getFullYear() + '-'
+                        //     + (currentdate.getMonth() + 1) + "-"
+                        //     + currentdate.getDate() + "_"
+                        //     + currentdate.getHours()
+                        //     + currentdate.getMinutes()
+                        //     + currentdate.getSeconds();
                         // process file content
                         let content: string = reader.result;
                         let fp = new Flightplan();
