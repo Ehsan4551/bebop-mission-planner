@@ -8,14 +8,15 @@ import { FileUploadModule } from 'primeng/primeng';
 import { FlightplanService } from 'bebop-bridge-shared';
 import { Flightplan, Waypoint } from 'bebop-bridge-shared';
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
-import * as leaflet from "leaflet";
+import "leaflet";
+import "leaflet-draw";
 import * as fileSaver from "file-saver";
 
 let geolib = require('geolib');
 
 interface LayerItem {
     name: string;
-    value: leaflet.TileLayer;
+    value: L.TileLayer;
 }
 
 @Component({
@@ -32,13 +33,13 @@ export class PlannerComponent implements OnInit {
     private _enableUpload: boolean = false;
     private _loadKmzLabel: string = 'Load kmz file';
 
-    private _map: leaflet.Map = null;
+    private _map: L.Map = null;
     private _mapLayers: LayerItem[] = [];
 
-    private _flightplanPolyline: leaflet.Polyline = null;
-    private _flightplanWaypoints: leaflet.Circle[] = [];
-    private _flightplanBearings: leaflet.Polyline[] = [];
-    private _flightplanMarkers: leaflet.Marker[] = [];
+    private _flightplanPolyline: L.Polyline = null;
+    private _flightplanWaypoints: L.Circle[] = [];
+    private _flightplanBearings: L.Polyline[] = [];
+    private _flightplanMarkers: L.Marker[] = [];
 
     private _flightplan: Flightplan = null;
 
@@ -110,13 +111,38 @@ export class PlannerComponent implements OnInit {
     ngOnInit(): void {
 
         // Create a map instance
-        this._map = leaflet.map('mapid').setView([47.468722, 8.274975], 13);
+        this._map = L.map('mapid').setView([47.468722, 8.274975], 15);
 
+        // Leaflet-draw =============================================
+
+        // FeatureGroup is to store editable layers
+        let drawnItems = L.featureGroup();
+        this._map.addLayer(drawnItems);
+        //drawnItems.addTo(this._map);
+        let drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: drawnItems
+            }
+        });
+        this._map.addControl(drawControl);
+
+        this._map.on(L.Draw.Event.CREATED, (e: any) => {
+            let type = e.layerType;
+            let layer = e.layer;
+            if (type === 'marker') {
+                // Do marker specific actions
+            }
+
+            // Do whatever else you need to. (save to db, add to map etc)
+            drawnItems.addLayer(layer);
+        });
+
+        // Eof Leaflet-draw =============================================
 
         // Google map imagery layer
         this._mapLayers.push({
             name: 'Google',
-            value: leaflet.tileLayer(
+            value: L.tileLayer(
                 'http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
                     maxZoom: 21,
                     subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
@@ -126,7 +152,7 @@ export class PlannerComponent implements OnInit {
         // Agis map imagery layer
         this._mapLayers.push({
             name: 'Agis',
-            value: leaflet.tileLayer(
+            value: L.tileLayer(
                 'http://mapproxy.osm.ch:8080/tiles/AGIS2014/EPSG900913/{z}/{x}/{y}.png?origin=nw', { // http://mapproxy.osm.ch/demo -> 2014
                     //private _mapSource: string = 'http://mapproxy.osm.ch:8080/tiles/AGIS2016/EPSG900913/{z}/{x}/{y}.png?origin=nw'; // http://mapproxy.osm.ch/demo -> 2016
                     maxZoom: 18,
@@ -343,7 +369,7 @@ export class PlannerComponent implements OnInit {
 
     // =============================================
 
-    private drawFlightplan(flightplan: Flightplan, map: leaflet.Map): void {
+    private drawFlightplan(flightplan: Flightplan, map: L.Map): void {
 
         // Remove any previous flightplan drawing from the map.
         if (this._flightplanPolyline) {
@@ -371,27 +397,27 @@ export class PlannerComponent implements OnInit {
         if (flightplan) {
 
             // Create array of LatLng from flightplan waypoints
-            let lla: leaflet.LatLng[] = [];
+            let lla: L.LatLng[] = [];
 
             // Take-off position
-            lla.push(leaflet.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude, 0));
+            lla.push(L.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude, 0));
 
             // waypoints
             flightplan.waypoints.forEach(wp => {
-                lla.push(leaflet.latLng(wp.latitude, wp.longitude, 0));
+                lla.push(L.latLng(wp.latitude, wp.longitude, 0));
             });
 
             // Touchdown position
-            lla.push(leaflet.latLng(flightplan.touchDownPosition.latitude, flightplan.touchDownPosition.longitude, 0));
+            lla.push(L.latLng(flightplan.touchDownPosition.latitude, flightplan.touchDownPosition.longitude, 0));
 
             // Add the polyline to the map
-            this._flightplanPolyline = leaflet.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
+            this._flightplanPolyline = L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
 
             // Add a waypoint radius for each waypoint
             for (let i = 0; i < flightplan.numWaypoints; i++) {
                 let wp: Waypoint = flightplan.waypoints[i];
-                let center = new leaflet.LatLng(wp.latitude, wp.longitude);
-                this._flightplanWaypoints.push(leaflet.circle(center, wp.radius).addTo(this._map));
+                let center = new L.LatLng(wp.latitude, wp.longitude);
+                this._flightplanWaypoints.push(L.circle(center, wp.radius).addTo(this._map));
             }
 
             // Add bearing indicator for each waypoint
@@ -400,10 +426,10 @@ export class PlannerComponent implements OnInit {
                 let endpoint = geolib.computeDestinationPoint(wp, wp.radius * 2.0, wp.orientation);
                 console.log('wp: ' + JSON.stringify(wp));
                 console.log('end: ' + JSON.stringify(endpoint));
-                let line: leaflet.LatLng[] = [];
-                line.push(leaflet.latLng(wp.latitude, wp.longitude));
-                line.push(leaflet.latLng(endpoint.latitude, endpoint.longitude));
-                this._flightplanBearings.push(leaflet.polyline(line, { color: "yellow", lineJoin: "round", lineCap: "butt" }).addTo(this._map));
+                let line: L.LatLng[] = [];
+                line.push(L.latLng(wp.latitude, wp.longitude));
+                line.push(L.latLng(endpoint.latitude, endpoint.longitude));
+                this._flightplanBearings.push(L.polyline(line, { color: "yellow", lineJoin: "round", lineCap: "butt" }).addTo(this._map));
             }
 
             // Add altitude markers 
@@ -412,14 +438,14 @@ export class PlannerComponent implements OnInit {
                 let endpoint = geolib.computeDestinationPoint(wp, wp.radius * 2.0, wp.orientation);
                 console.log('wp: ' + JSON.stringify(wp));
                 console.log('end: ' + JSON.stringify(endpoint));
-                let center: leaflet.LatLng = leaflet.latLng(wp.latitude, wp.longitude);
-                let marker = leaflet.marker([wp.latitude, wp.longitude], { opacity: 0.01 }); //opacity may be set to zero
+                let center: L.LatLng = L.latLng(wp.latitude, wp.longitude);
+                let marker = L.marker([wp.latitude, wp.longitude], { opacity: 0.01 }); //opacity may be set to zero
                 marker.bindTooltip("WP: " + i.toString() + ", Altitude: " + wp.altitude.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
                 this._flightplanMarkers.push(marker.addTo(this._map));
             }
 
             // Center map on take-off location
-            this._map.panTo(leaflet.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude));
+            this._map.panTo(L.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude));
         }
     }
 

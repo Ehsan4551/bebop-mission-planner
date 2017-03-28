@@ -285,6 +285,14 @@ module.exports = function (options) {
         {
           from: 'node_modules/leaflet/dist/leaflet.css',
           to: 'assets/leaflet/leaflet.css'
+        },
+        {
+          from: 'node_modules/leaflet-draw/dist/leaflet.draw.css',
+          to: 'assets/leaflet/leaflet.draw.css'
+        },
+        {
+          from: 'node_modules/leaflet-draw/dist/images',
+          to: 'assets/leaflet/images'
         }
       ]),
 
