@@ -8,16 +8,21 @@ import { FileUploadModule } from 'primeng/primeng';
 import { FlightplanService } from 'bebop-bridge-shared';
 import { Flightplan, Waypoint } from 'bebop-bridge-shared';
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
-import "leaflet";
-import "leaflet-draw";
 import * as fileSaver from "file-saver";
 
-let geolib = require('geolib');
-
+// Leaflet dependencies
+import "leaflet";
+import "leaflet-draw";
+let L = require("leaflet");
+let leafletDraw = require('leaflet-draw'); // Some stuff is not in the typings (yet). E.g. L.Draw.Polyline
 interface LayerItem {
     name: string;
     value: L.TileLayer;
 }
+
+// Geolib
+let geolib = require('geolib');
+
 
 @Component({
     selector: 'mission-planner',
@@ -35,6 +40,7 @@ export class PlannerComponent implements OnInit {
 
     private _map: L.Map = null;
     private _mapLayers: LayerItem[] = [];
+    private _polygonDrawer = null;
 
     private _flightplanPolyline: L.Polyline = null;
     private _flightplanWaypoints: L.Circle[] = [];
@@ -58,54 +64,7 @@ export class PlannerComponent implements OnInit {
 
     constructor() {
 
-        this._waypointDistances.push({ label: '1', value: 1 });
-        this._waypointDistances.push({ label: '2', value: 2 });
-        this._waypointDistances.push({ label: '3', value: 3 });
-        this._waypointDistances.push({ label: '5', value: 5 });
-        this._waypointDistances.push({ label: '8', value: 8 });
-        this._waypointDistances.push({ label: '13', value: 13 });
-
-        this._bearings.push({ label: 'N', value: 0 });
-        this._bearings.push({ label: 'NE', value: 45 });
-        this._bearings.push({ label: 'E', value: 90 });
-        this._bearings.push({ label: 'SE', value: 135 });
-        this._bearings.push({ label: 'S', value: 180 });
-        this._bearings.push({ label: 'SW', value: 225 });
-        this._bearings.push({ label: 'W', value: 270 });
-        this._bearings.push({ label: 'NW', value: 315 });
-
-        this._waypointRadii.push({ label: '1', value: 1 });
-        this._waypointRadii.push({ label: '2', value: 2 });
-        this._waypointRadii.push({ label: '3', value: 3 });
-        this._waypointRadii.push({ label: '5', value: 5 });
-
-        this._altitudes.push({ label: '1', value: 1 });
-        this._altitudes.push({ label: '2', value: 2 });
-        this._altitudes.push({ label: '3', value: 3 });
-        this._altitudes.push({ label: '4', value: 4 });
-        this._altitudes.push({ label: '5', value: 5 });
-        this._altitudes.push({ label: '6', value: 6 });
-        this._altitudes.push({ label: '7', value: 7 });
-        this._altitudes.push({ label: '8', value: 8 });
-        this._altitudes.push({ label: '9', value: 9 });
-        this._altitudes.push({ label: '10', value: 10 });
-        this._altitudes.push({ label: '12', value: 12 });
-        this._altitudes.push({ label: '15', value: 15 });
-        this._altitudes.push({ label: '18', value: 18 });
-        this._altitudes.push({ label: '20', value: 20 });
-        this._altitudes.push({ label: '25', value: 25 });
-
-        this._velocities.push({ label: '1', value: 1 });
-        this._velocities.push({ label: '2', value: 2 });
-        this._velocities.push({ label: '3', value: 3 });
-        this._velocities.push({ label: '5', value: 5 });
-        this._velocities.push({ label: '8', value: 8 });
-
-        this._holdTimes.push({ label: '1', value: 1 });
-        this._holdTimes.push({ label: '2', value: 2 });
-        this._holdTimes.push({ label: '3', value: 3 });
-        this._holdTimes.push({ label: '5', value: 5 });
-        this._holdTimes.push({ label: '8', value: 8 });
+        this.addDropdownOptions();
     }
 
     ngOnInit(): void {
@@ -126,14 +85,20 @@ export class PlannerComponent implements OnInit {
         });
         this._map.addControl(drawControl);
 
+        // Create a polygon 'handler'
+        this._polygonDrawer = new L.Draw.Polygon(this._map, drawControl.options.polyline);
+
         this._map.on(L.Draw.Event.CREATED, (e: any) => {
             let type = e.layerType;
-            let layer = e.layer;
+            let layer = e.layer; // a layer is a shape e.g. Polyline
             if (type === 'marker') {
-                // Do marker specific actions
-            }
 
-            // Do whatever else you need to. (save to db, add to map etc)
+            }
+            else if(type === 'polygon'){
+                console.log("Polygon drawn!");
+                let latlngs = layer.getLatLngs();
+                console.log('latlngs: ' + JSON.stringify(latlngs));
+            }
             drawnItems.addLayer(layer);
         });
 
@@ -169,6 +134,12 @@ export class PlannerComponent implements OnInit {
 
     }
 
+    /**
+     * Start drawing a polygon.
+     */
+    addPolygon(): void{
+        this._polygonDrawer.enable();
+    }
 
     // Add flight plan functionality ====================================
 
@@ -466,4 +437,54 @@ export class PlannerComponent implements OnInit {
         this._msgs.push({ severity: 'success', summary: 'Success', detail: message });
     }
 
+    private addDropdownOptions(): void {
+        this._waypointDistances.push({ label: '1', value: 1 });
+        this._waypointDistances.push({ label: '2', value: 2 });
+        this._waypointDistances.push({ label: '3', value: 3 });
+        this._waypointDistances.push({ label: '5', value: 5 });
+        this._waypointDistances.push({ label: '8', value: 8 });
+        this._waypointDistances.push({ label: '13', value: 13 });
+
+        this._bearings.push({ label: 'N', value: 0 });
+        this._bearings.push({ label: 'NE', value: 45 });
+        this._bearings.push({ label: 'E', value: 90 });
+        this._bearings.push({ label: 'SE', value: 135 });
+        this._bearings.push({ label: 'S', value: 180 });
+        this._bearings.push({ label: 'SW', value: 225 });
+        this._bearings.push({ label: 'W', value: 270 });
+        this._bearings.push({ label: 'NW', value: 315 });
+
+        this._waypointRadii.push({ label: '1', value: 1 });
+        this._waypointRadii.push({ label: '2', value: 2 });
+        this._waypointRadii.push({ label: '3', value: 3 });
+        this._waypointRadii.push({ label: '5', value: 5 });
+
+        this._altitudes.push({ label: '1', value: 1 });
+        this._altitudes.push({ label: '2', value: 2 });
+        this._altitudes.push({ label: '3', value: 3 });
+        this._altitudes.push({ label: '4', value: 4 });
+        this._altitudes.push({ label: '5', value: 5 });
+        this._altitudes.push({ label: '6', value: 6 });
+        this._altitudes.push({ label: '7', value: 7 });
+        this._altitudes.push({ label: '8', value: 8 });
+        this._altitudes.push({ label: '9', value: 9 });
+        this._altitudes.push({ label: '10', value: 10 });
+        this._altitudes.push({ label: '12', value: 12 });
+        this._altitudes.push({ label: '15', value: 15 });
+        this._altitudes.push({ label: '18', value: 18 });
+        this._altitudes.push({ label: '20', value: 20 });
+        this._altitudes.push({ label: '25', value: 25 });
+
+        this._velocities.push({ label: '1', value: 1 });
+        this._velocities.push({ label: '2', value: 2 });
+        this._velocities.push({ label: '3', value: 3 });
+        this._velocities.push({ label: '5', value: 5 });
+        this._velocities.push({ label: '8', value: 8 });
+
+        this._holdTimes.push({ label: '1', value: 1 });
+        this._holdTimes.push({ label: '2', value: 2 });
+        this._holdTimes.push({ label: '3', value: 3 });
+        this._holdTimes.push({ label: '5', value: 5 });
+        this._holdTimes.push({ label: '8', value: 8 });
+    }
 }
