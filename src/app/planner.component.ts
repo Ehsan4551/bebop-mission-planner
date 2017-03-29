@@ -20,6 +20,9 @@ interface LayerItem {
     value: L.TileLayer;
 }
 
+// Polygon offset
+let Offset = require('polygon-offset');
+
 // Geolib
 let geolib = require('geolib');
 
@@ -94,10 +97,43 @@ export class PlannerComponent implements OnInit {
             if (type === 'marker') {
 
             }
-            else if(type === 'polygon'){
+            else if (type === 'polygon') {
                 console.log("Polygon drawn!");
-                let latlngs = layer.getLatLngs();
-                console.log('latlngs: ' + JSON.stringify(latlngs));
+
+                // Test Polygon Offset: =====
+
+                let latlngs = layer.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
+
+                // assuming 1 shape only
+                let points = [];
+                latlngs.forEach((shape) => {
+                    shape.forEach((latLng) => {
+                        points.push([latLng.lat, latLng.lng]);
+                    });
+                    // add the first as the last (required by polygon-offset)
+                    if (points.length > 0) {
+                        points.push([points[0][0], points[0][1]]);
+                    }
+                });
+                console.log('array: ' + points.length);
+
+                let offset = new Offset();
+                let padding = offset.data(points).padding(0.001); // is a 3-d array: 2d-coordinates for n contours [[[x, y], [x, y], ...], [[x, y], ...]]
+                console.log('Padding points: ' + JSON.stringify(padding));
+                console.log('length 0: ' + padding.length);
+                console.log('length 1: ' + padding[0].length);
+
+                // assuming there results only one contour..
+                let lla: L.LatLng[] = [];
+                padding.forEach((contour) => {
+                    contour.forEach((pnt) => {
+                        console.log('pnt: ' + pnt[0] + ' ' + pnt[1]);
+                        lla.push(L.latLng(pnt[0], pnt[1]));
+                    });
+                });
+                L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
+
+                 // Eof Test Polygon Offset: ===== 
             }
             drawnItems.addLayer(layer);
         });
@@ -137,7 +173,7 @@ export class PlannerComponent implements OnInit {
     /**
      * Start drawing a polygon.
      */
-    addPolygon(): void{
+    addPolygon(): void {
         this._polygonDrawer.enable();
     }
 
