@@ -20,6 +20,8 @@ interface LayerItem {
     value: L.TileLayer;
 }
 
+import { FlightpathDefinition } from './flightpath-definition';
+
 // Polygon offset
 let Offset = require('polygon-offset');
 
@@ -43,7 +45,15 @@ export class PlannerComponent implements OnInit {
 
     private _map: L.Map = null;
     private _mapLayers: LayerItem[] = [];
+
+    // FlightpathDefinition
     private _polygonDrawer = null;
+    private _drawingEnvelope: boolean = false;
+    private _editingEnvelope: boolean = false;
+    private _editButtonTextEdit: string = "Edit envelope...";
+    private _editButtonTextEditing: string = "Stop editing";
+
+    private _flightpathDefinition: FlightpathDefinition = new FlightpathDefinition();
 
     private _flightplanPolyline: L.Polyline = null;
     private _flightplanWaypoints: L.Circle[] = [];
@@ -98,42 +108,13 @@ export class PlannerComponent implements OnInit {
 
             }
             else if (type === 'polygon') {
-                console.log("Polygon drawn!");
 
-                // Test Polygon Offset: =====
-
-                let latlngs = layer.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
-
-                // assuming 1 shape only
-                let points = [];
-                latlngs.forEach((shape) => {
-                    shape.forEach((latLng) => {
-                        points.push([latLng.lat, latLng.lng]);
-                    });
-                    // add the first as the last (required by polygon-offset)
-                    if (points.length > 0) {
-                        points.push([points[0][0], points[0][1]]);
-                    }
-                });
-                console.log('array: ' + points.length);
-
-                let offset = new Offset();
-                let padding = offset.data(points).padding(0.001); // is a 3-d array: 2d-coordinates for n contours [[[x, y], [x, y], ...], [[x, y], ...]]
-                console.log('Padding points: ' + JSON.stringify(padding));
-                console.log('length 0: ' + padding.length);
-                console.log('length 1: ' + padding[0].length);
-
-                // assuming there results only one contour..
-                let lla: L.LatLng[] = [];
-                padding.forEach((contour) => {
-                    contour.forEach((pnt) => {
-                        console.log('pnt: ' + pnt[0] + ' ' + pnt[1]);
-                        lla.push(L.latLng(pnt[0], pnt[1]));
-                    });
-                });
-                L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
-
-                 // Eof Test Polygon Offset: ===== 
+                // Setting newly drawn flightpath envelope polygon
+                if (this._drawingEnvelope) {
+                    console.log("Envelope drawn!");
+                    this._drawingEnvelope = false;
+                    this._flightpathDefinition.envelope = layer;
+                }
             }
             drawnItems.addLayer(layer);
         });
@@ -170,11 +151,79 @@ export class PlannerComponent implements OnInit {
 
     }
 
+    // ==================== Drawing Flightpath definition ===================
+
     /**
-     * Start drawing a polygon.
+     * Start drawing a polygon for the flight path definition.
      */
-    addPolygon(): void {
+    addFlightPolygon(): void {
         this._polygonDrawer.enable();
+        this._drawingEnvelope = true;
+    }
+
+    /**
+     * Edit the polygon of the flight path definition.
+     */
+    editFlightPolygon(): void {
+        if (this._flightpathDefinition.envelope && !this._editingEnvelope) {
+            this._flightpathDefinition.envelope.editing.enable();
+            this._editingEnvelope = true;
+        }
+        else if (this._flightpathDefinition.envelope && this._editingEnvelope) {
+            this._flightpathDefinition.envelope.editing.disable();
+            this._editingEnvelope = false;
+        }
+        else {
+            this.showError("No flight path envelope selected. Create one first.");
+        }
+    }
+
+    /**
+     * Remove the current flight path definition polygon.
+     */
+    removeFlightPolygon(): void {
+        this._flightpathDefinition.envelope = null; // setter does the remove logic
+    }
+
+    // Geneating flight path stuff
+
+    createOffsetCurves(): void {
+
+        // Test Polygon Offset: =====
+        if (this._flightpathDefinition.envelope) {
+
+            let latlngs = this._flightpathDefinition.envelope.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
+
+            // assuming 1 shape only
+            let points = [];
+            latlngs.forEach((shape) => {
+                shape.forEach((latLng) => {
+                    points.push([latLng.lat, latLng.lng]);
+                });
+                // add the first as the last (required by polygon-offset)
+                if (points.length > 0) {
+                    points.push([points[0][0], points[0][1]]);
+                }
+            });
+            console.log('array: ' + points.length);
+
+            let offset = new Offset();
+            let padding = offset.data(points).padding(0.001); // is a 3-d array: 2d-coordinates for n contours [[[x, y], [x, y], ...], [[x, y], ...]]
+            console.log('Padding points: ' + JSON.stringify(padding));
+            console.log('length 0: ' + padding.length);
+            console.log('length 1: ' + padding[0].length);
+
+            // assuming there results only one contour..
+            let lla: L.LatLng[] = [];
+            padding.forEach((contour) => {
+                contour.forEach((pnt) => {
+                    console.log('pnt: ' + pnt[0] + ' ' + pnt[1]);
+                    lla.push(L.latLng(pnt[0], pnt[1]));
+                });
+            });
+            L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
+        }
+
     }
 
     // Add flight plan functionality ====================================

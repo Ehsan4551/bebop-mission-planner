@@ -65,17 +65,38 @@
 			<button class="dashboard-card-item" (click)="generateMavlink()">Generate mavlink code</button>
 		</td>
 		<td>
-			
+
 		</td>
 		<td>
 			<button class="dashboard-card-item" (click)="saveFlightplan()">Download mission</button>
 		</td>
 		<td>
-			
+
 		</td>
 	</tr>
 </table>
-<button class="dashboard-card-item" (click)="addPolygon()">Add Polygon</button>
+<table>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="addFlightPolygon()">Add envelope...</button>
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="editFlightPolygon()">{{this._editingEnvelope ? this._editButtonTextEditing : this._editButtonTextEdit}}</button>
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="removeFlightPolygon()">Remove envelope</button>
+		</td>
+	</tr>
+</table>
+
+<table>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="createOffsetCurves()">Create offset curves</button>
+		</td>		
+	</tr>
+</table>
+
 
 <a style="display: none">
 </a>
