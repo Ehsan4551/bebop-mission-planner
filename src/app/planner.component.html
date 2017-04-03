@@ -81,19 +81,34 @@
 			<button class="dashboard-card-item" (click)="addFlightPolygon()">Add envelope...</button>
 		</td>
 		<td>
-			<button class="dashboard-card-item" (click)="editFlightPolygon()">{{this._editingEnvelope ? this._editButtonTextEditing : this._editButtonTextEdit}}</button>
+			<button class="dashboard-card-item" (click)="editFlightPolygon()">{{this._editingEnvelope ? "Stop editing" : "Edit envelope..."}}</button>
 		</td>
 		<td>
 			<button class="dashboard-card-item" (click)="removeFlightPolygon()">Remove envelope</button>
 		</td>
 	</tr>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="addFlightlevelPoints()">{{this._drawingFlightlevelPoints ? "Stop adding flight level points" : "Add flight level points..."}}</button>
+		</td>
+		<td>
+			Default altitude
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelDefaultAltitude"></p-dropdown> [m]
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="removeFlightLevelPoints()">Remove flight level points</button>
+		</td>
+	</tr>
 </table>
+
 
 <table>
 	<tr>
 		<td>
 			<button class="dashboard-card-item" (click)="createOffsetCurves()">Create offset curves</button>
-		</td>		
+		</td>
 	</tr>
 </table>
 

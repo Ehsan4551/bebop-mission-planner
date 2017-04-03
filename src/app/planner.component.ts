@@ -5,8 +5,7 @@ import { Message } from 'primeng/primeng';
 import { DropdownModule } from 'primeng/primeng';
 import { SelectItem } from 'primeng/primeng';
 import { FileUploadModule } from 'primeng/primeng';
-import { FlightplanService } from 'bebop-bridge-shared';
-import { Flightplan, Waypoint } from 'bebop-bridge-shared';
+import { Flightplan, Waypoint } from './flightplan';
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
 import * as fileSaver from "file-saver";
 
@@ -48,10 +47,12 @@ export class PlannerComponent implements OnInit {
 
     // FlightpathDefinition
     private _polygonDrawer = null;
+    private _polygon = null; // a L.Polygon
+    private _flightLevelPoints = []; // array of L.Marker
     private _drawingEnvelope: boolean = false;
     private _editingEnvelope: boolean = false;
-    private _editButtonTextEdit: string = "Edit envelope...";
-    private _editButtonTextEditing: string = "Stop editing";
+    private _flightlevelPointsDrawer = null;
+    private _drawingFlightlevelPoints: boolean = false;
 
     private _flightpathDefinition: FlightpathDefinition = new FlightpathDefinition();
 
@@ -70,6 +71,7 @@ export class PlannerComponent implements OnInit {
     private _selectedWaypointRadius: number = 2;
     private _altitudes: SelectItem[] = [];
     private _selectedAltitude = 8;
+    private _selectedFlightLevelDefaultAltitude = 8;
     private _velocities: SelectItem[] = [];
     private _selectedVelocity = 2;
     private _holdTimes: SelectItem[] = [];
@@ -99,21 +101,34 @@ export class PlannerComponent implements OnInit {
         this._map.addControl(drawControl);
 
         // Create a polygon 'handler'
-        this._polygonDrawer = new L.Draw.Polygon(this._map, drawControl.options.polyline);
+        this._polygonDrawer = new L.Draw.Polygon(this._map);
+
+        // Create point 'handler'
+        this._flightlevelPointsDrawer = new L.Draw.Marker(this._map);
+        this._flightlevelPointsDrawer.options.repeatMode = true;
 
         this._map.on(L.Draw.Event.CREATED, (e: any) => {
             let type = e.layerType;
             let layer = e.layer; // a layer is a shape e.g. Polyline
+            console.log('Draw event: ' + type);
             if (type === 'marker') {
-
+                if (this._drawingFlightlevelPoints) {
+                    layer.altitude = this._selectedFlightLevelDefaultAltitude; // add an altitude attribute ... after all, it's JS, so who cares?
+                    layer.bindTooltip("Altitude: " + layer.altitude.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
+                    this._flightLevelPoints.push(layer);
+                    console.log("Flight level point drawn!");
+                }
             }
             else if (type === 'polygon') {
-
                 // Setting newly drawn flightpath envelope polygon
                 if (this._drawingEnvelope) {
-                    console.log("Envelope drawn!");
                     this._drawingEnvelope = false;
-                    this._flightpathDefinition.envelope = layer;
+                    // remove old polygon from map
+                    this.removeFlightPolygon();
+                    // store new polygon
+                    this._polygon = layer;
+                    // add points of new polygon to flightpath definition.
+                    this.updateFlightEnvelope(layer, this._flightpathDefinition);
                 }
             }
             drawnItems.addLayer(layer);
@@ -153,9 +168,32 @@ export class PlannerComponent implements OnInit {
 
     // ==================== Drawing Flightpath definition ===================
 
+
+    addFlightlevelPoints(): void {
+        // start adding points
+        if (!this._drawingFlightlevelPoints) {
+            this._flightlevelPointsDrawer.enable();
+            this._drawingFlightlevelPoints = true;
+        }
+        // stop adding points
+        else {
+            this._drawingFlightlevelPoints = false;
+            this._flightlevelPointsDrawer.disable();
+        }
+    }
+
+    removeFlightLevelPoints(): void {
+        this._flightLevelPoints.forEach((flp) => {
+            flp.remove();
+            flp = null;
+        });
+        this._flightLevelPoints = [];
+        // TODO: update flight path definition.
+    }
+
     /**
-     * Start drawing a polygon for the flight path definition.
-     */
+    * Start drawing a polygon for the flight path definition.
+    */
     addFlightPolygon(): void {
         this._polygonDrawer.enable();
         this._drawingEnvelope = true;
@@ -165,14 +203,18 @@ export class PlannerComponent implements OnInit {
      * Edit the polygon of the flight path definition.
      */
     editFlightPolygon(): void {
-        if (this._flightpathDefinition.envelope && !this._editingEnvelope) {
-            this._flightpathDefinition.envelope.editing.enable();
+        // Start editing
+        if (this._polygon && !this._editingEnvelope) {
+            this._polygon.editing.enable();
             this._editingEnvelope = true;
         }
-        else if (this._flightpathDefinition.envelope && this._editingEnvelope) {
-            this._flightpathDefinition.envelope.editing.disable();
+        // Stop editing
+        else if (this._polygon && this._editingEnvelope) {
+            this._polygon.editing.disable();
             this._editingEnvelope = false;
+            this.updateFlightEnvelope(this._polygon, this._flightpathDefinition);
         }
+        // Cannot edit if no envelope created
         else {
             this.showError("No flight path envelope selected. Create one first.");
         }
@@ -182,47 +224,51 @@ export class PlannerComponent implements OnInit {
      * Remove the current flight path definition polygon.
      */
     removeFlightPolygon(): void {
-        this._flightpathDefinition.envelope = null; // setter does the remove logic
+        if (this._polygon) {
+            this._polygon.remove();
+            this._polygon = null;
+            this.updateFlightEnvelope(this._polygon, this._flightpathDefinition);
+        }
     }
 
     // Geneating flight path stuff
 
     createOffsetCurves(): void {
 
-        // Test Polygon Offset: =====
-        if (this._flightpathDefinition.envelope) {
+        // // Test Polygon Offset: =====
+        // if (this._flightpathDefinition.envelope) {
 
-            let latlngs = this._flightpathDefinition.envelope.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
+        //     let latlngs = this._flightpathDefinition.envelope.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
 
-            // assuming 1 shape only
-            let points = [];
-            latlngs.forEach((shape) => {
-                shape.forEach((latLng) => {
-                    points.push([latLng.lat, latLng.lng]);
-                });
-                // add the first as the last (required by polygon-offset)
-                if (points.length > 0) {
-                    points.push([points[0][0], points[0][1]]);
-                }
-            });
-            console.log('array: ' + points.length);
+        //     // assuming 1 shape only
+        //     let points = [];
+        //     latlngs.forEach((shape) => {
+        //         shape.forEach((latLng) => {
+        //             points.push([latLng.lat, latLng.lng]);
+        //         });
+        //         // add the first as the last (required by polygon-offset)
+        //         if (points.length > 0) {
+        //             points.push([points[0][0], points[0][1]]);
+        //         }
+        //     });
+        //     console.log('array: ' + points.length);
 
-            let offset = new Offset();
-            let padding = offset.data(points).padding(0.001); // is a 3-d array: 2d-coordinates for n contours [[[x, y], [x, y], ...], [[x, y], ...]]
-            console.log('Padding points: ' + JSON.stringify(padding));
-            console.log('length 0: ' + padding.length);
-            console.log('length 1: ' + padding[0].length);
+        //     let offset = new Offset();
+        //     let padding = offset.data(points).padding(0.001); // is a 3-d array: 2d-coordinates for n contours [[[x, y], [x, y], ...], [[x, y], ...]]
+        //     console.log('Padding points: ' + JSON.stringify(padding));
+        //     console.log('length 0: ' + padding.length);
+        //     console.log('length 1: ' + padding[0].length);
 
-            // assuming there results only one contour..
-            let lla: L.LatLng[] = [];
-            padding.forEach((contour) => {
-                contour.forEach((pnt) => {
-                    console.log('pnt: ' + pnt[0] + ' ' + pnt[1]);
-                    lla.push(L.latLng(pnt[0], pnt[1]));
-                });
-            });
-            L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
-        }
+        //     // assuming there results only one contour..
+        //     let lla: L.LatLng[] = [];
+        //     padding.forEach((contour) => {
+        //         contour.forEach((pnt) => {
+        //             console.log('pnt: ' + pnt[0] + ' ' + pnt[1]);
+        //             lla.push(L.latLng(pnt[0], pnt[1]));
+        //         });
+        //     });
+        //     L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
+        // }
 
     }
 
@@ -502,6 +548,35 @@ export class PlannerComponent implements OnInit {
 
             // Center map on take-off location
             this._map.panTo(L.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude));
+        }
+    }
+
+    updateFlightEnvelope(layer, fpd: FlightpathDefinition): void {
+        if (layer == null) {
+            fpd.clearEnvelope();
+            console.log('Flight envelope coordinate array: ' + '[[]]');
+            return;
+        }
+        // add here the coordinates of the polygon to the flightpath definition
+        // getLatLngs is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
+        // we expect only 1 shape in this layer.                   
+        let latlngs = layer.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
+        if (latlngs.length !== 1) {
+            this.showError("More than 1 polygon drawn.");
+        }
+        else {
+            latlngs.forEach((shape) => {
+                let points = [];
+                shape.forEach((latLng) => {
+                    points.push([latLng.lat, latLng.lng]);
+                });
+                // add the first as the last (required by polygon-offset)
+                if (points.length > 0) {
+                    points.push([points[0][0], points[0][1]]);
+                }
+                console.log('Flight envelope coordinate array: ' + JSON.stringify(points));
+                fpd.envelope = points;
+            });
         }
     }
 
