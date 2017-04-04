@@ -47,13 +47,16 @@ export class PlannerComponent implements OnInit {
 
     // FlightpathDefinition
     private _polygonDrawer = null;
+    private _flightlevelPointsDrawer = null;
+    private _addingEnvelope: boolean = false;
+    private _addingFlightLevelPoints: boolean = false;
+
+    // 'ViewModel' Data of flightpath definition
     private _polygon = null; // a L.Polygon
     private _flightLevelPoints = []; // array of L.Marker
-    private _drawingEnvelope: boolean = false;
-    private _editingEnvelope: boolean = false;
-    private _flightlevelPointsDrawer = null;
-    private _drawingFlightlevelPoints: boolean = false;
+    private _selectedFlightLevelPoint = null; // a L.Marker from above array
 
+    // The flightpath definiton.
     private _flightpathDefinition: FlightpathDefinition = new FlightpathDefinition();
 
     private _flightplanPolyline: L.Polyline = null;
@@ -76,6 +79,9 @@ export class PlannerComponent implements OnInit {
     private _selectedVelocity = 2;
     private _holdTimes: SelectItem[] = [];
     private _selectedHoldTime: number = 1;
+
+    private _tagFlightLevelPoint: string = 'flight-level-point';
+    private _tagFlightEnvelope: string = 'flight-envelope-polygon';
 
     constructor() {
 
@@ -100,6 +106,21 @@ export class PlannerComponent implements OnInit {
         });
         this._map.addControl(drawControl);
 
+        // If clicking on one of the features drawn with leaflet-draw.
+        drawnItems.on('click', (e: any) => {
+            let layer = e.layer;
+            if (layer.hasOwnProperty("tag")) {
+                // If clicking on the flight envelope polygon
+                if (layer.tag == this._tagFlightEnvelope) {
+                    this.toggleEditFlightPolygon(layer);
+                }
+                // If clicking on a flight level point
+                else if (layer.tag == this._tagFlightLevelPoint) {
+                    this.toggleEditFlightLevelPoint(layer);
+                }
+            }
+        });
+
         // Create a polygon 'handler'
         this._polygonDrawer = new L.Draw.Polygon(this._map);
 
@@ -107,26 +128,37 @@ export class PlannerComponent implements OnInit {
         this._flightlevelPointsDrawer = new L.Draw.Marker(this._map);
         this._flightlevelPointsDrawer.options.repeatMode = true;
 
+        // this._map.on('click', (e: any) => {
+        //     console.log("I was clicked: " + e.latlng.toString());
+        // });
+
         this._map.on(L.Draw.Event.CREATED, (e: any) => {
             let type = e.layerType;
             let layer = e.layer; // a layer is a shape e.g. Polyline
-            console.log('Draw event: ' + type);
             if (type === 'marker') {
-                if (this._drawingFlightlevelPoints) {
-                    layer.altitude = this._selectedFlightLevelDefaultAltitude; // add an altitude attribute ... after all, it's JS, so who cares?
+                if (this._addingFlightLevelPoints) {
+                    layer.altitude = this._selectedFlightLevelDefaultAltitude; // add an altitude attribute ... hey, it's JS after all, so who cares?
+                    layer.tag = this._tagFlightLevelPoint; // add a tag, so later we know what this is
                     layer.bindTooltip("Altitude: " + layer.altitude.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
+                    layer.index = this._flightLevelPoints.length;
+                    layer.on('mouseover', () => { // update the content of the tooltip on mouseover
+                        if (layer._tooltip) { // TODO: don't access private member
+                            layer._tooltip.setContent("Altitude: " + layer.altitude.toString());
+                        }
+                    });
                     this._flightLevelPoints.push(layer);
-                    console.log("Flight level point drawn!");
+                    this.updateFlightLevelPoints();
                 }
             }
             else if (type === 'polygon') {
                 // Setting newly drawn flightpath envelope polygon
-                if (this._drawingEnvelope) {
-                    this._drawingEnvelope = false;
+                if (this._addingEnvelope) {
+                    this._addingEnvelope = false;
                     // remove old polygon from map
                     this.removeFlightPolygon();
                     // store new polygon
                     this._polygon = layer;
+                    this._polygon.tag = this._tagFlightEnvelope; // add a tag, so later we know what this is.
                     // add points of new polygon to flightpath definition.
                     this.updateFlightEnvelope(layer, this._flightpathDefinition);
                 }
@@ -169,15 +201,15 @@ export class PlannerComponent implements OnInit {
     // ==================== Drawing Flightpath definition ===================
 
 
-    addFlightlevelPoints(): void {
+    toggleAddFlightLevelPoints(): void {
         // start adding points
-        if (!this._drawingFlightlevelPoints) {
+        if (!this._addingFlightLevelPoints) {
             this._flightlevelPointsDrawer.enable();
-            this._drawingFlightlevelPoints = true;
+            this._addingFlightLevelPoints = true;
         }
         // stop adding points
         else {
-            this._drawingFlightlevelPoints = false;
+            this._addingFlightLevelPoints = false;
             this._flightlevelPointsDrawer.disable();
         }
     }
@@ -188,31 +220,69 @@ export class PlannerComponent implements OnInit {
             flp = null;
         });
         this._flightLevelPoints = [];
-        // TODO: update flight path definition.
+        this.updateFlightLevelPoints();
+    }
+
+    disableEditAllFlightLevelPoints(): void {
+        this._flightLevelPoints.forEach((flp) => {
+            flp.editing.disable();
+        })
+    }
+
+    /**
+     * Edit the passed marker.
+     * @param marker a leaflet L.Marker representing a flight level point.
+     */
+    toggleEditFlightLevelPoint(marker: any): void {
+        if (marker && !marker.editing.enabled()) {
+            this.disableEditAllFlightLevelPoints(); // disable editing for all flight level points first
+            marker.editing.enable();
+            this._selectedFlightLevelPoint = marker;
+        }
+        else if (marker && marker.editing.enabled()) {
+            marker.editing.disable();
+            this._selectedFlightLevelPoint = null;
+            this.updateFlightLevelPoints();
+        }
+        else {
+            this.showError("No flight level point selected.");
+        }
+    }
+
+    /**
+     * Called when flight level point data changed, point data including altitude.
+     */
+    updateFlightLevelPoints(): void {
+        // TODO: update the flightpath definition here
+        // - generate delaunay triangulation and draw it
+        // - add triangle coordinates to flightpath definitinon
+        console.log('Flight level point data changed!');
     }
 
     /**
     * Start drawing a polygon for the flight path definition.
     */
     addFlightPolygon(): void {
+        this.removeFlightPolygon()
         this._polygonDrawer.enable();
-        this._drawingEnvelope = true;
+        this._addingEnvelope = true;
     }
 
     /**
      * Edit the polygon of the flight path definition.
+     * @param polygon a leaflet L.Polygon representing the flight envelope.
      */
-    editFlightPolygon(): void {
+    toggleEditFlightPolygon(polygon: any): void {
         // Start editing
-        if (this._polygon && !this._editingEnvelope) {
-            this._polygon.editing.enable();
-            this._editingEnvelope = true;
+        if (polygon && !polygon.editing.enabled()) {
+            polygon.editing.enable();
+            polygon.setStyle({ color: 'yellow' });
         }
         // Stop editing
-        else if (this._polygon && this._editingEnvelope) {
-            this._polygon.editing.disable();
-            this._editingEnvelope = false;
-            this.updateFlightEnvelope(this._polygon, this._flightpathDefinition);
+        else if (polygon && polygon.editing.enabled()) {
+            polygon.editing.disable();
+            polygon.setStyle({ color: '#3388ff' });
+            this.updateFlightEnvelope(polygon, this._flightpathDefinition);
         }
         // Cannot edit if no envelope created
         else {
@@ -225,6 +295,7 @@ export class PlannerComponent implements OnInit {
      */
     removeFlightPolygon(): void {
         if (this._polygon) {
+            this._polygon.editing.disable();
             this._polygon.remove();
             this._polygon = null;
             this.updateFlightEnvelope(this._polygon, this._flightpathDefinition);

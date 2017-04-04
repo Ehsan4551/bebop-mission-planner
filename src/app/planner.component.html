@@ -81,18 +81,20 @@
 			<button class="dashboard-card-item" (click)="addFlightPolygon()">Add envelope...</button>
 		</td>
 		<td>
-			<button class="dashboard-card-item" (click)="editFlightPolygon()">{{this._editingEnvelope ? "Stop editing" : "Edit envelope..."}}</button>
 		</td>
+		<!--<td>
+			<button class="dashboard-card-item" (click)="toggleEditFlightPolygon()">{{(this._polygon && this._polygon.editing.enabled()) ? "Stop editing" : "Edit envelope..."}}</button>
+		</td>-->
 		<td>
 			<button class="dashboard-card-item" (click)="removeFlightPolygon()">Remove envelope</button>
 		</td>
 	</tr>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="addFlightlevelPoints()">{{this._drawingFlightlevelPoints ? "Stop adding flight level points" : "Add flight level points..."}}</button>
+			<button class="dashboard-card-item" (click)="toggleAddFlightLevelPoints()">{{this._addingFlightLevelPoints ? "Stop adding flight level points" : "Add flight level points..."}}</button>
 		</td>
 		<td>
-			Default altitude
+			Altitude of next point
 		</td>
 		<td>
 			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelDefaultAltitude"></p-dropdown> [m]
@@ -101,8 +103,19 @@
 			<button class="dashboard-card-item" (click)="removeFlightLevelPoints()">Remove flight level points</button>
 		</td>
 	</tr>
+	<tr *ngIf="this._selectedFlightLevelPoint">
+		<td>
+			Level point {{this._selectedFlightLevelPoint ? this._selectedFlightLevelPoint.index : "none"}}
+		</td>
+		<td>
+			Set altitude
+		</td>
+		<td>
+			<!--<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" (onChange)="updateFlightLevelPoints($event)" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelPoint.altitude"></p-dropdown> [m]-->
+			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelPoint.altitude"></p-dropdown> [m]
+		</td>
+	</tr>
 </table>
-
 
 <table>
 	<tr>
