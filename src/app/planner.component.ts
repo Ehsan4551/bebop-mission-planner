@@ -37,10 +37,11 @@ let geolib = require('geolib');
 export class PlannerComponent implements OnInit {
 
     @ViewChild('kmzFileDialog') kmzFileDialogElement: ElementRef; // https://angular.io/docs/js/latest/api/core/index/ElementRef-class.html
+    @ViewChild('mavlinkFileDialog') mavlinkFileDialogElement: ElementRef; // https://angular.io/docs/js/latest/api/core/index/ElementRef-class.html
 
     private _msgs: Message[] = [];
-    private _enableUpload: boolean = false;
     private _loadKmzLabel: string = 'Load kmz file';
+    private _loadMavlinkLabel: string = 'Load mavlink file';
 
     private _map: L.Map = null;
     private _mapLayers: LayerItem[] = [];
@@ -345,6 +346,50 @@ export class PlannerComponent implements OnInit {
 
     // Add flight plan functionality ====================================
 
+    addMavlinkFile(inputElement: HTMLInputElement): void {
+        this.readMavlinkFile(this.mavlinkFileDialogElement.nativeElement).subscribe(
+            (flightplan: Flightplan) => {
+                this._flightplan = flightplan;
+                this.drawFlightplan(this._flightplan, this._map);
+            },
+            (error) => {
+                console.log(error);
+                this.showError(error);
+            },
+            () => { }
+        );
+    }
+
+    readMavlinkFile(inputElement: HTMLInputElement): Observable<Flightplan> {
+        return Observable.create((observer) => {
+            if (this.isValidFileElement(inputElement)) {
+                let reader: FileReader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        let fp = new Flightplan(reader.result);
+                        this.resetInputFileElement(this.mavlinkFileDialogElement.nativeElement, this._loadMavlinkLabel);
+                        console.log('Read flightplan (mavlink): ' + JSON.stringify(fp));
+                        observer.next(fp);
+                        observer.complete();
+                    }
+                    catch (err) {
+                        this.resetInputFileElement(this.mavlinkFileDialogElement.nativeElement, this._loadMavlinkLabel);
+                        let msg: string = 'Could not parse mavlink content. ' + err.message;
+                        console.error(msg);
+                        observer.error(msg);
+                    }
+                }
+                reader.onerror = (err) => {
+                    this.resetInputFileElement(this.mavlinkFileDialogElement.nativeElement, this._loadMavlinkLabel);
+                    let msg: string = 'FileReader error. ' + err.message;
+                    console.error(msg);
+                    observer.error(msg);
+                };
+                reader.readAsText(inputElement.files[0]);
+            }
+        });
+    }
+
     addKmzFile(inputElement: HTMLInputElement): void {
         // (don't need to use inputElement)
         this.readKmzFile(this.kmzFileDialogElement.nativeElement).subscribe(
@@ -362,7 +407,7 @@ export class PlannerComponent implements OnInit {
 
     readKmzFile(inputElement: HTMLInputElement): Observable<Flightplan> {
         return Observable.create((observer) => {
-            if (this.isValidKmzFileElement(inputElement)) {
+            if (this.isValidFileElement(inputElement)) {
                 let reader: FileReader = new FileReader();
                 reader.onload = (e) => {
                     try {
@@ -406,7 +451,7 @@ export class PlannerComponent implements OnInit {
         });
     }
 
-    isValidKmzFileElement(inputElement: HTMLInputElement) {
+    isValidFileElement(inputElement: HTMLInputElement) {
         return !!(inputElement && inputElement.files && inputElement.files[0]); // && inputElement.files[0].name.endsWith('.mavlink') === true);
     }
 

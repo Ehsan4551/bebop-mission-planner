@@ -5,12 +5,16 @@
 <table>
 	<tr>
 		<td>
-			<input class="dashboard-card-item" type="button" value="Load Kmz ..." onclick="document.getElementById('selectedFile').click();"
+			<input class="dashboard-card-item" type="button" value="Load Kmz ..." onclick="document.getElementById('selectedKmzFile').click();"
 			/>
-			<input class="dashboard-card-item" type="file" id="selectedFile" style="display: none;" #kmzFileDialog (change)="addKmzFile(kmzFileDialog)"
+			<input class="dashboard-card-item" type="file" id="selectedKmzFile" style="display: none;" #kmzFileDialog (change)="addKmzFile(kmzFileDialog)"
 			/>
 		</td>
 		<td>
+			<input class="dashboard-card-item" type="button" value="Load Mavlink ..." onclick="document.getElementById('selectedMavlinkFile').click();"
+			/>
+			<input class="dashboard-card-item" type="file" id="selectedMavlinkFile" style="display: none;" #mavlinkFileDialog (change)="addMavlinkFile(mavlinkFileDialog)"
+			/>
 		</td>
 		<td>
 			<button class="dashboard-card-item" (click)="setBearingToCenter()">Center bearing</button>
