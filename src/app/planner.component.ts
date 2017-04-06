@@ -60,6 +60,7 @@ export class PlannerComponent implements OnInit {
     // The flightpath definiton.
     private _flightpathDefinition: FlightpathDefinition = new FlightpathDefinition();
 
+    private _drawnItems = L.featureGroup(); // FeatureGroup is to store editable layers
     private _flightplanPolyline: L.Polyline = null;
     private _flightplanWaypoints: L.Circle[] = [];
     private _flightplanBearings: L.Polyline[] = [];
@@ -83,6 +84,7 @@ export class PlannerComponent implements OnInit {
 
     private _tagFlightLevelPoint: string = 'flight-level-point';
     private _tagFlightEnvelope: string = 'flight-envelope-polygon';
+    private _tagFlightplanPolyline: string = 'flight-plan-polyline';
 
     constructor() {
 
@@ -96,20 +98,19 @@ export class PlannerComponent implements OnInit {
 
         // Leaflet-draw =============================================
 
-        // FeatureGroup is to store editable layers
-        let drawnItems = L.featureGroup();
-        this._map.addLayer(drawnItems);
-        //drawnItems.addTo(this._map);
+        this._map.addLayer(this._drawnItems);
+        //this._drawnItems.addTo(this._map);
         let drawControl = new L.Control.Draw({
             edit: {
-                featureGroup: drawnItems
+                featureGroup: this._drawnItems
             }
         });
         this._map.addControl(drawControl);
 
         // If clicking on one of the features drawn with leaflet-draw.
-        drawnItems.on('click', (e: any) => {
+        this._drawnItems.on('click', (e: any) => {
             let layer = e.layer;
+            console.log('clicked, tag: ' + JSON.stringify(layer.tag));
             if (layer.hasOwnProperty("tag")) {
                 // If clicking on the flight envelope polygon
                 if (layer.tag == this._tagFlightEnvelope) {
@@ -118,6 +119,10 @@ export class PlannerComponent implements OnInit {
                 // If clicking on a flight level point
                 else if (layer.tag == this._tagFlightLevelPoint) {
                     this.toggleEditFlightLevelPoint(layer);
+                }
+                else if (layer.tag == this._tagFlightplanPolyline){
+                    console.log('called edit');
+                    this.toggleEditFlightplan();
                 }
             }
         });
@@ -164,7 +169,7 @@ export class PlannerComponent implements OnInit {
                     this.updateFlightEnvelope(layer, this._flightpathDefinition);
                 }
             }
-            drawnItems.addLayer(layer);
+            this._drawnItems.addLayer(layer);
         });
 
         // Eof Leaflet-draw =============================================
@@ -629,7 +634,9 @@ export class PlannerComponent implements OnInit {
             lla.push(L.latLng(flightplan.touchDownPosition.latitude, flightplan.touchDownPosition.longitude, 0));
 
             // Add the polyline to the map
-            this._flightplanPolyline = L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }).addTo(this._map);
+            this._flightplanPolyline = L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }); // .addTo(this._map);
+            (<any>this._flightplanPolyline).tag = this._tagFlightplanPolyline; // add a tag, so later we know what this is
+            this._drawnItems.addLayer(this._flightplanPolyline);
 
             // Add a waypoint radius for each waypoint
             for (let i = 0; i < flightplan.numWaypoints; i++) {
@@ -664,6 +671,20 @@ export class PlannerComponent implements OnInit {
 
             // Center map on take-off location
             this._map.panTo(L.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude));
+        }
+    }
+
+    toggleEditFlightplan(): void {
+        if (this._flightplanPolyline && (<any>this._flightplanPolyline).editing.enabled()) {
+            (<any>this._flightplanPolyline).editing.disable();
+            // Update the flightplan
+            //this.updateFlightpath() // todo  write flightplan polyline into flightplan with setFlightpath
+        }
+        else if (this._flightplanPolyline && !(<any>this._flightplanPolyline).editing.enabled()) {
+            (<any>this._flightplanPolyline).editing.enable();
+        }
+        else {
+            this.showError("No flight level point selected.");
         }
     }
 

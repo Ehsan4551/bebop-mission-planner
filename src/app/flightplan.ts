@@ -238,6 +238,21 @@ export class Flightplan extends EventEmitter {
         });
     }
 
+    /**
+     * Set the flight path.
+     * Erases any previously generated internal mavlink representation.
+     */
+    setFlightpath(path: Waypoint[], takeoff: Waypoint, touchdown: Waypoint) {
+        if (path && path.length != 0 && takeoff && touchdown) {
+            this._mavlink = "";
+            this._waypoints = path;
+            this._takeOffPosition = takeoff;
+            this._touchDownPosition = touchdown;
+        }
+        else {
+            throw new Error("Invalid flightpath data passed to Flightplan.setFlightpath()");
+        }
+    }
 
     /**
     * Add waypoints every stepSize meters to the waypoints of this flight path. Latitude, longitude and altitude is interpolated.
