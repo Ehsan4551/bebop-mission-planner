@@ -413,10 +413,6 @@ export class PlannerComponent implements OnInit {
         }
     }
 
-    addMosquitoMarker(): void {
-        console.log('Add Mosquito marker clicked');
-    }
-
     hotkeys(event) {
         // // ALT + t
         // if (event.keyCode === 84 && event.altKey) {

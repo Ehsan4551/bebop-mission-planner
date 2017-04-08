@@ -116,20 +116,21 @@
 	</tr>
 </table>
 
+<hr>
+<div>Points of Interest</div>
+
 <table>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="addMosquitoMarker()">Add Mosquito marker</button>
+			<label>Latitude: </label><input [ngModel]="this._flightplanViewModel.newPointOfInterestLatitude" (ngModelChange)="this._flightplanViewModel.newPointOfInterestLatitude = $event">
 		</td>
 		<td>
-
+			<label>Longitude: </label><input [ngModel]="this._flightplanViewModel.newPointOfInterestLongitude" (ngModelChange)="this._flightplanViewModel.newPointOfInterestLongitude = $event">
 		</td>
 		<td>
-
+			<button class="dashboard-card-item" (click)="this._flightplanViewModel.addPointOfInterest()">Add point of interest...</button>
 		</td>
-		<td>
 
-		</td>
 	</tr>
 </table>
 

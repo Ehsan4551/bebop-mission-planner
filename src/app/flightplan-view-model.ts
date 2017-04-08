@@ -36,6 +36,12 @@ export class FlightplanViewModel {
     private _selectedWaypointIndex: number = -1; // none
     private _selectedWaypoint: Waypoint = null;
 
+    // Points of interest
+    public newPointOfInterestLatitude: number = 47;
+    public newPointOfInterestLongitude: number = 8;
+    private _pointsOfInterestMarkers: L.Marker[] = [];
+    private _iconPointOfInterest = null;
+
     // Flight level
     private _flightLevelPoints = []; // array of L.Marker
     private _selectedFlightLevelPoint = null; // a L.Marker from above array
@@ -58,6 +64,7 @@ export class FlightplanViewModel {
     private _tagTakeoffPoint: string = 'take-off-point';
     private _tagTouchdownPoint: string = 'touch-down-point';
     private _tagWaypointCircle: string = 'waypoint-circle';
+    private _tagPointOfInterest: string = 'point-of-interest';
 
     // TODO: Stuff which should belong to a view-model of the flightpath defintion model.
     private _addingEnvelope: boolean = false;
@@ -108,6 +115,12 @@ export class FlightplanViewModel {
             iconSize: [28, 28], // size of the icon
             iconAnchor: [14, 14], // point of the icon which will correspond to marker's location
             popupAnchor: [-3, -76] // point from which the popup should open relative to the iconAnchor
+        });
+        this._iconPointOfInterest = L.icon({
+            iconUrl: 'assets/img/star.png',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor: [-3, -76]
         });
 
         // If clicking on one of the features drawn with leaflet-draw.
@@ -299,6 +312,26 @@ export class FlightplanViewModel {
         }
     }
 
+    private redrawPointsOfInterest(): void {
+        // Remove previous points of interest
+        this._pointsOfInterestMarkers.forEach((poi) => {
+            poi.remove();
+            poi = null;
+        });
+        this._pointsOfInterestMarkers = [];
+        // Add points of interest markers
+        this._flightplan.pointsOfInterest.forEach((poi) => {
+            console.log('poi: ' + poi.lat + ' ' + poi.lng);
+            let m = L.marker([poi.lat, poi.lng], { icon: this._iconPointOfInterest });
+            m.tag = this._tagPointOfInterest; // add a tag, so later we know what this is
+            this._pointsOfInterestMarkers.push(m);
+            this._drawnItems.addLayer(m);
+            // TODO, continue from here (what's missing in drawing markers?)
+            // All working fine? Need to be able to edit one?
+        });
+
+    }
+
     private redrawFlightplanWaypoints(): void {
 
         // Remove any previous flightplan drawing from the map.
@@ -394,6 +427,7 @@ export class FlightplanViewModel {
         this.redrawFlightplanTakeoffPosition();
         this.redrawFlightplanTouchDownPosition();
         this.redrawFlightplanWaypoints();
+        this.redrawPointsOfInterest();
     }
 
     // Center map on take-off location
@@ -545,6 +579,17 @@ export class FlightplanViewModel {
         }
     }
 
+    addPointOfInterest(): void {
+        if (this._flightplan) {
+            this._flightplan.addPointOfInterest(L.latLng(this.newPointOfInterestLatitude, this.newPointOfInterestLongitude));
+        }
+        else{
+            this._obsErrors.next("No flight plan created yet.");
+        }
+        // let poi = L.marker([this._flightplan.takeOffPosition.latitude, this._flightplan.takeOffPosition.longitude], { icon: this._iconTakeoff });
+        // (<any>this._flightplanTakeoffMarker).tag = this._tagTakeoffPoint; // add a tag, so later we know what this is
+        // this._drawnItems.addLayer(this._flightplanTakeoffMarker);
+    }
 
     toggleAddFlightLevelPoints(): void {
         // start adding points
@@ -744,7 +789,6 @@ export class FlightplanViewModel {
             // What if touch down changes
             this._flightplan.touchDownPositionObs().subscribe(
                 (wp: Waypoint) => {
-                    console.log('touchDownPositionObs name changed');
                     this.redrawFlightplanTouchDownPosition();
                 },
                 (err) => {
@@ -755,7 +799,6 @@ export class FlightplanViewModel {
             // What if waypoint data changes
             this._flightplan.waypointsObs().subscribe(
                 (wps: Waypoint[]) => {
-                    console.log('waypointsObs name changed');
                     this.redrawFlightplanWaypoints();
                 },
                 (err) => {
@@ -763,10 +806,19 @@ export class FlightplanViewModel {
                 },
                 () => { }
             );
+            // What if points of interest change
+            this._flightplan.pointsOfInterestObs().subscribe(
+                (pois: L.LatLng[]) => {
+                    this.redrawPointsOfInterest();
+                },
+                (err) => {
+                    this._obsErrors.next("Error receiving points of interest update in view model.");
+                },
+                () => { }
+            );
             // What if something changes and we don't know what
             this._flightplan.onChangeObs().subscribe(
                 () => {
-                    console.log('Unspecified flightplan change received by view model.');
                     this.redrawFlightplan();
                 },
                 (err) => {

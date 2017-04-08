@@ -53,6 +53,7 @@ export class Flightplan {
     private _takeOffPosition: Waypoint = null;
     private _touchDownPosition: Waypoint = null;
     private _waypoints: Waypoint[] = []; // array of Positions without take-off and touch-down posititions (cmds '22', '21')
+    private _pointsOfInterest: L.LatLng[] = [];
 
     // Obserables on the flightplan state
     private _obsOnChange: Subject<void> = new Subject<void>();
@@ -61,6 +62,8 @@ export class Flightplan {
     private _obsTakeOffPosition: Subject<Waypoint> = new Subject<Waypoint>();
     private _obsTouchDownPosition: Subject<Waypoint> = new Subject<Waypoint>();
     private _obsWaypoints: Subject<Waypoint[]> = new Subject<Waypoint[]>();
+    private _obsPointsOfInterest: Subject<L.LatLng[]> = new Subject<L.LatLng[]>();
+
     /**
      * Construct a flight plan instance. Can throw an error if parsing mavlink fails
      * @param mavlink If present, parseMavlink is called by the constructor, otherwise an 
@@ -101,6 +104,10 @@ export class Flightplan {
 
     public waypointsObs(): Observable<Waypoint[]> {
         return this._obsWaypoints;
+    }
+
+    public pointsOfInterestObs(): Observable<L.LatLng[]> {
+        return this._obsPointsOfInterest;
     }
 
     /**
@@ -227,6 +234,13 @@ export class Flightplan {
     }
 
     /**
+     * Get points of interest.
+     */
+    get pointsOfInterest(): L.LatLng[] {
+        return this._pointsOfInterest;
+    }
+
+    /**
      * Set an accuracy radius for each waypoint.
      * @param radius Radius set for each waypoint.
      */
@@ -328,6 +342,16 @@ export class Flightplan {
         }
         else {
             throw new Error("Invalid takeoff data passed to Flightplan.setTouchdown()");
+        }
+    }
+
+    addPointOfInterest(p: L.LatLng): void {
+        if(p){
+            this._pointsOfInterest.push(p);
+            this._obsPointsOfInterest.next(this._pointsOfInterest);
+        }
+        else {
+            throw new Error("Invalid point of interest data passed to Flightplan.addPointOfInterest()");
         }
     }
 
