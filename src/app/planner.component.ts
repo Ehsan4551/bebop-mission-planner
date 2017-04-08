@@ -78,6 +78,28 @@ export class PlannerComponent implements OnInit {
         // Create a flightplan view model
         this._flightplanViewModel = new FlightplanViewModel(this._flightplan, this._map);
 
+        // Register to receive view model error messages
+        this._flightplanViewModel.errors().subscribe(
+            (message: string) => {
+                this.showError(message);
+            },
+            err => {
+                this.showError(err);
+            },
+            () => { }
+        )
+
+        // Register to receive view model error messages
+        this._flightplanViewModel.warnings().subscribe(
+            (message: string) => {
+                this.showWarning(message);
+            },
+            err => {
+                this.showWarning(err);
+            },
+            () => { }
+        )
+
         // Create the Leaflet Draw control toolbar on the map
         let drawControl = new L.Control.Draw({
             edit: {
@@ -85,23 +107,6 @@ export class PlannerComponent implements OnInit {
             }
         });
         this._map.addControl(drawControl);
-
-        // When things are drawn with the drawer objects.
-        this._map.on(L.Draw.Event.CREATED, (e: any) => {
-            let type = e.layerType;
-            let layer = e.layer; // a layer is a shape e.g. a Polyline
-            if (type === 'marker') {
-                if (this._flightplanViewModel.addingFlightLevelPoints) {
-                    this._flightplanViewModel.addFlightLevelPoint(layer);
-                }
-            }
-            else if (type === 'polygon') {
-                if (this._flightplanViewModel.addingEnvelope) {
-                    this._flightplanViewModel.addEnvelope(layer);
-                }
-            }
-            this._flightplanViewModel.featureGroup.addLayer(layer);
-        });
 
         // Google map imagery layer
         this._mapLayers.push({
@@ -408,6 +413,10 @@ export class PlannerComponent implements OnInit {
         }
     }
 
+    addMosquitoMarker(): void {
+        console.log('Add Mosquito marker clicked');
+    }
+
     hotkeys(event) {
         // // ALT + t
         // if (event.keyCode === 84 && event.altKey) {
@@ -419,10 +428,13 @@ export class PlannerComponent implements OnInit {
         this._msgs = [];
         this._msgs.push({ severity: 'error', summary: 'Error', detail: message });
     }
-
+    private showWarning(message: string): void {
+        this._msgs = [];
+        this._msgs.push({ severity: 'warn', summary: 'Warning', detail: message });
+    }
     private showInfo(message: string): void {
         this._msgs = [];
-        this._msgs.push({ severity: 'success', summary: 'Success', detail: message });
+        this._msgs.push({ severity: 'info', summary: 'Success', detail: message });
     }
 
     addFlightplanDropdownOptions(): void {

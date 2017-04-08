@@ -33,6 +33,8 @@ export class FlightplanViewModel {
     private _flightplanTouchdownMarker: L.Marker = null;
     private _iconTakeoff = null;
     private _iconTouchdown = null;
+    private _selectedWaypointIndex: number = -1; // none
+    private _selectedWaypoint: Waypoint = null;
 
     // Flight level
     private _flightLevelPoints = []; // array of L.Marker
@@ -53,6 +55,9 @@ export class FlightplanViewModel {
     private _tagFlightLevelPoint: string = 'flight-level-point';
     private _tagFlightEnvelope: string = 'flight-envelope-polygon';
     private _tagFlightplanPolyline: string = 'flight-plan-polyline';
+    private _tagTakeoffPoint: string = 'take-off-point';
+    private _tagTouchdownPoint: string = 'touch-down-point';
+    private _tagWaypointCircle: string = 'waypoint-circle';
 
     // TODO: Stuff which should belong to a view-model of the flightpath defintion model.
     private _addingEnvelope: boolean = false;
@@ -65,6 +70,8 @@ export class FlightplanViewModel {
 
     // Error reporter
     private _obsErrors: Subject<string> = new Subject<string>();
+    // Warning reporter
+    private _obsWarnings: Subject<string> = new Subject<string>();
 
     // Visualization options
     private _drawWaypointsOn: boolean = true;
@@ -106,20 +113,43 @@ export class FlightplanViewModel {
         // If clicking on one of the features drawn with leaflet-draw.
         this._drawnItems.on('click', (e: any) => {
             let layer = e.layer;
-            console.log('clicked, tag: ' + JSON.stringify(layer.tag));
             if (layer.hasOwnProperty("tag")) {
-                // If clicking on the flight envelope polygon
                 if (layer.tag === this._tagFlightEnvelope) {
                     this.toggleEditFlightPolygon(layer);
                 }
-                // If clicking on a flight level point
                 else if (layer.tag === this._tagFlightLevelPoint) {
                     this.toggleEditFlightLevelPoint(layer);
                 }
                 else if (layer.tag === this._tagFlightplanPolyline) {
                     this.toggleEditFlightplanPolyline();
                 }
+                else if (layer.tag === this._tagTakeoffPoint) {
+                    this.toggleEditTakeoffPoint();
+                }
+                else if (layer.tag === this._tagTouchdownPoint) {
+                    this.toggleEditTouchdownPoint();
+                }
+                else if (layer.tag === this._tagWaypointCircle) {
+                    this.toggleEditWaypoint(layer.index);
+                }
             }
+        });
+
+        // When things are drawn with the drawer objects.
+        this._map.on(L.Draw.Event.CREATED, (e: any) => {
+            let type = e.layerType;
+            let layer = e.layer; // a layer is a shape e.g. a Polyline
+            if (type === 'marker') {
+                if (this.addingFlightLevelPoints) {
+                    this.addFlightLevelPoint(layer);
+                }
+            }
+            else if (type === 'polygon') {
+                if (this.addingEnvelope) {
+                    this.addEnvelope(layer);
+                }
+            }
+            this.featureGroup.addLayer(layer);
         });
     }
 
@@ -135,6 +165,13 @@ export class FlightplanViewModel {
      */
     errors(): Observable<string> {
         return this._obsErrors;
+    }
+
+    /**
+     * Return an observable reporting warning messages.
+     */
+    warnings(): Observable<string> {
+        return this._obsWarnings;
     }
 
     /**
@@ -219,14 +256,30 @@ export class FlightplanViewModel {
         return this._drawTakeoffOn;
     }
 
+    /**
+     * Is -1 if none is selected.
+     */
+    get selectedWaypointIndex(): number {
+        return this._selectedWaypointIndex;
+    }
+
+    /**
+     * Is the selected waypoint or null.
+     */
+    get selectedWaypoint(): Waypoint {
+        return this._selectedWaypoint;
+    }
+
+
     private redrawFlightplanTakeoffPosition(): void {
         if (this._flightplanTakeoffMarker) {
             this._flightplanTakeoffMarker.remove();
-            this._flightplanTouchdownMarker = null;
+            this._flightplanTakeoffMarker = null;
         }
         if (this._drawTakeoffOn) {
             if (this._flightplan) {
                 this._flightplanTakeoffMarker = L.marker([this._flightplan.takeOffPosition.latitude, this._flightplan.takeOffPosition.longitude], { icon: this._iconTakeoff });
+                (<any>this._flightplanTakeoffMarker).tag = this._tagTakeoffPoint; // add a tag, so later we know what this is
                 this._drawnItems.addLayer(this._flightplanTakeoffMarker);
             }
         }
@@ -240,6 +293,7 @@ export class FlightplanViewModel {
         if (this._drawTouchdownOn) {
             if (this._flightplan) {
                 this._flightplanTouchdownMarker = L.marker([this._flightplan.touchDownPosition.latitude, this._flightplan.touchDownPosition.longitude], { icon: this._iconTouchdown });
+                (<any>this._flightplanTouchdownMarker).tag = this._tagTouchdownPoint; // add a tag, so later we know what this is
                 this._drawnItems.addLayer(this._flightplanTouchdownMarker);
             }
         }
@@ -290,11 +344,19 @@ export class FlightplanViewModel {
             this._drawnItems.addLayer(this._flightplanPolyline);
 
             if (this._drawWaypointsOn) {
+
                 // Add a waypoint radius for each waypoint
                 for (let i = 0; i < this._flightplan.numWaypoints; i++) {
                     let wp: Waypoint = this._flightplan.waypoints[i];
                     let center = new L.LatLng(wp.latitude, wp.longitude);
-                    this._flightplanWaypoints.push(L.circle(center, wp.radius).addTo(this._map));
+                    let wpCircle = L.circle(center, wp.radius);
+                    wpCircle.index = i;
+                    wpCircle.tag = this._tagWaypointCircle;
+                    if (i === this._selectedWaypointIndex) {
+                        wpCircle.setStyle({ color: 'yellow' }); // set to highlighted style
+                    }
+                    this._drawnItems.addLayer(wpCircle);
+                    this._flightplanWaypoints.push(wpCircle);
                 }
 
                 // Add bearing indicator for each waypoint
@@ -304,15 +366,18 @@ export class FlightplanViewModel {
                     let line: L.LatLng[] = [];
                     line.push(L.latLng(wp.latitude, wp.longitude));
                     line.push(L.latLng(endpoint.latitude, endpoint.longitude));
-                    this._flightplanBearings.push(L.polyline(line, { color: "yellow", lineJoin: "round", lineCap: "butt" }).addTo(this._map));
+                    let bearingLine = L.polyline(line, { color: "yellow", lineJoin: "round", lineCap: "butt" });
+                    bearingLine.index = i;
+                    this._flightplanBearings.push(bearingLine.addTo(this._map));
                 }
 
-                // Add altitude markers 
+                // Add waypoint markers (to carry a popup)
                 for (let i = 0; i < this._flightplan.numWaypoints; i++) {
                     let wp: Waypoint = this._flightplan.waypoints[i];
                     let endpoint = geolib.computeDestinationPoint(wp, wp.radius * 2.0, wp.orientation);
                     let center: L.LatLng = L.latLng(wp.latitude, wp.longitude);
                     let marker = L.marker([wp.latitude, wp.longitude], { opacity: 0.01 }); //opacity may be set to zero
+                    marker.index = i;
                     marker.bindTooltip("WP: " + i.toString() + ", Altitude: " + wp.altitude.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
                     this._flightplanWaypointMarkers.push(marker.addTo(this._map));
                 }
@@ -341,7 +406,7 @@ export class FlightplanViewModel {
     toggleEditFlightplanPolyline(): void {
         if (this._flightplanPolyline && (<any>this._flightplanPolyline).editing.enabled()) {
             (<any>this._flightplanPolyline).editing.disable();
-            this.updateWaypoints()
+            this.updateWaypoints();
         }
         else if (this._flightplanPolyline && !(<any>this._flightplanPolyline).editing.enabled()) {
             (<any>this._flightplanPolyline).editing.enable();
@@ -352,16 +417,134 @@ export class FlightplanViewModel {
     }
 
     updateWaypoints(): void {
-        // This resets altitude, bearing and radius (TODO: prevent this)
-        let coords = this._flightplanPolyline.getLatLngs(); // is a L.LatLng
-        let wps: Waypoint[] = [];
-        coords.forEach((coord) => {
-            wps.push(new Waypoint(coord.lat, coord.lng, this._selectedFlightLevelDefaultAltitude, this._selectedBearing, this._selectedWaypointRadius));
-        })
         if (this._flightplan) {
-            this._flightplan.setWaypoints(wps);
+            let newWaypoints: Waypoint[] = [];
+            let coords = this._flightplanPolyline.getLatLngs(); // is a L.LatLng
+            if (coords.length === this._flightplan.waypoints.length) {
+                console.log("Number of waypoints didn't change, retaining waypoint attributes like altitude.");
+                for (let i: number = 0; i < coords.length; i++) {
+                    newWaypoints.push(new Waypoint(
+                        coords[i].lat,
+                        coords[i].lng,
+                        this._flightplan.waypoints[i].altitude,
+                        this._flightplan.waypoints[i].orientation,
+                        this._flightplan.waypoints[i].radius));
+                }
+            }
+            else {
+                // This resets altitude, bearing and radius (TODO: prevent this)
+                console.log("Number of waypoints changed. Resetting waypoint attributes like altitude to selected default values.");
+                coords.forEach((coord) => {
+                    newWaypoints.push(new Waypoint(
+                        coord.lat,
+                        coord.lng,
+                        this._selectedFlightLevelDefaultAltitude,
+                        this._selectedBearing,
+                        this._selectedWaypointRadius));
+                });
+                this._obsWarnings.next("Number of waypoints changed. All waypoint attributes like altitude have been reset!");
+            }
+            this._flightplan.setWaypoints(newWaypoints);
         }
     }
+
+    toggleEditTakeoffPoint(): void {
+        if (this._flightplanTakeoffMarker && (<any>this._flightplanTakeoffMarker).editing.enabled()) {
+            (<any>this._flightplanTakeoffMarker).editing.disable();
+            this.updateTakeoffPosition();
+        }
+        else if (this._flightplanTakeoffMarker && !(<any>this._flightplanTakeoffMarker).editing.enabled()) {
+            (<any>this._flightplanTakeoffMarker).editing.enable();
+        }
+        else {
+            this._obsErrors.next("Take-off point not selected.");
+        }
+    }
+
+    updateTakeoffPosition(): void {
+        if (this._flightplan) {
+            let ll: L.LatLng = this._flightplanTakeoffMarker.getLatLng();
+            let newWaypoint: Waypoint = new Waypoint(
+                ll.lat,
+                ll.lng,
+                this._flightplan.takeOffPosition.altitude,
+                this._flightplan.takeOffPosition.orientation,
+                this._flightplan.takeOffPosition.radius);
+            this._flightplan.setTakeoff(newWaypoint);
+        }
+    }
+
+    toggleEditTouchdownPoint(): void {
+        if (this._flightplanTouchdownMarker && (<any>this._flightplanTouchdownMarker).editing.enabled()) {
+            (<any>this._flightplanTouchdownMarker).editing.disable();
+            this.updateTouchdownPosition();
+        }
+        else if (this._flightplanTouchdownMarker && !(<any>this._flightplanTouchdownMarker).editing.enabled()) {
+            (<any>this._flightplanTouchdownMarker).editing.enable();
+        }
+        else {
+            this._obsErrors.next("Touch-down point not selected.");
+        }
+    }
+
+    updateTouchdownPosition(): void {
+        if (this._flightplan) {
+            let ll: L.LatLng = this._flightplanTouchdownMarker.getLatLng();
+            let newWaypoint: Waypoint = new Waypoint(
+                ll.lat,
+                ll.lng,
+                this._flightplan.touchDownPosition.altitude,
+                this._flightplan.touchDownPosition.orientation,
+                this._flightplan.touchDownPosition.radius);
+            this._flightplan.setTouchdown(newWaypoint);
+        }
+    }
+
+    toggleEditWaypoint(index: number) {
+        if (this._flightplan &&
+            index >= 0 &&
+            index < this._flightplan.waypoints.length &&
+            index < this._flightplanWaypoints.length) {
+
+            if (index !== this._selectedWaypointIndex) {
+                // A new point has been selected
+
+                // remove style from previous selection
+                if (this._selectedWaypointIndex >= 0) {
+                    this._flightplanWaypoints[this._selectedWaypointIndex].setStyle({ color: '#3388ff' }); // reset to normal style
+                }
+
+                // store the newly selected index
+                this._selectedWaypointIndex = index;
+
+                // store a copy of the selected waypoint
+                this._selectedWaypoint = this._flightplan.waypoints[index].clone();
+
+                // Highlight new selection
+                this._flightplanWaypoints[index].setStyle({ color: 'yellow' }); // set to highlighted style
+            }
+            else {
+                // The same point has been selected -> deselect
+                // remove style from previous selection
+                if (this._selectedWaypointIndex >= 0) {
+                    this._flightplanWaypoints[this._selectedWaypointIndex].setStyle({ color: '#3388ff' }); // reset to normal style
+                }
+                // deselect
+                this._selectedWaypointIndex = -1;
+            }
+        }
+        else {
+            this._selectedWaypointIndex = -1;
+            this._obsErrors.next("Invalid waypoint index received for editing");
+        }
+    }
+
+    updateSelectedWaypoint() {
+        if (this._flightplan && this._selectedWaypointIndex > 0) {
+            this._flightplan.setWaypoint(this._selectedWaypoint, this._selectedWaypointIndex); // clones the waypoint and emits waypoint observable next.
+        }
+    }
+
 
     toggleAddFlightLevelPoints(): void {
         // start adding points
@@ -590,7 +773,7 @@ export class FlightplanViewModel {
                     this._obsErrors.next("Error receiving unspecified change update in view model.");
                 },
                 () => { }
-            )
+            );
         }
     }
 

@@ -1,7 +1,16 @@
-<p-growl [value]="_msgs" life=5000></p-growl>
+<p-growl [value]="_msgs" life=10000></p-growl>
 
 <div id="mapid" style="width: 100%; height: 500px;"></div>
 
+<hr>
+
+<div>Flight Plan Editing</div>
+<ul>
+	<li>Click a waypoint circle to edit the properties of a single waypoint. Click the button to apply the changes.</li>
+	<li>Click the red flight path to drag waypoints or create new ones. Click it again to apply the changes. Beware: if waypoints
+		are added, waypoint properties are reset.</li>
+	<li>Click the take-off or touch-down icon to drag / move its position. Click it again to apply the changes.</li>
+</ul>
 <table>
 	<tr>
 		<td>
@@ -24,13 +33,13 @@
 	</tr>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="addIntermediateWaypoints()">Add waypoints</button>
+			<button class="dashboard-card-item" (click)="addIntermediateWaypoints()">Add waypoints every</button>
 		</td>
 		<td>
 			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointDistances" [(ngModel)]="this._flightplanViewModel.selectedWaypointDistance"></p-dropdown> [m]
 		</td>
 		<td>
-			<button class="dashboard-card-item" (click)="setBearing()">Reset bearing</button>
+			<button class="dashboard-card-item" (click)="setBearing()">Reset bearing for all waypoints</button>
 		</td>
 		<td>
 			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._bearings" [(ngModel)]="this._flightplanViewModel.selectedBearing"></p-dropdown> [deg]
@@ -38,47 +47,135 @@
 	</tr>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="setWaypointRadius()">Reset WP radius</button>
+			<button class="dashboard-card-item" (click)="setWaypointRadius()">Reset radius for all waypoints</button>
 		</td>
 		<td>
 			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointRadii" [(ngModel)]="this._flightplanViewModel.selectedWaypointRadius"></p-dropdown> [m]
 		</td>
 		<td>
-			<button class="dashboard-card-item" (click)="setAltitude()">Reset altitude</button>
+			<button class="dashboard-card-item" (click)="setAltitude()">Reset altitude for all waypoints</button>
 		</td>
 		<td>
 			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._flightplanViewModel.selectedAltitude"></p-dropdown> [m]
 		</td>
 	</tr>
+</table>
+
+<div *ngIf="this._flightplanViewModel.selectedWaypointIndex > -1">
+	<hr>
+	<div>Edit Single Waypoint</div>
+	<table>
+		<tr>
+			<td>
+				Waypoint index: {{this._flightplanViewModel.selectedWaypointIndex}}
+			</td>
+		</tr>
+		<tr>
+			<td>
+				<label>Lat:</label><input [ngModel]="this._flightplanViewModel.selectedWaypoint.latitude" (ngModelChange)="this._flightplanViewModel.selectedWaypoint.latitude = $event">
+
+			</td>
+			<td>
+				<label>Lon:</label><input [ngModel]="this._flightplanViewModel.selectedWaypoint.longitude" (ngModelChange)="this._flightplanViewModel.selectedWaypoint.longitude = $event">
+			</td>
+			<td>
+				<label>Alt:</label><input [ngModel]="this._flightplanViewModel.selectedWaypoint.altitude" (ngModelChange)="this._flightplanViewModel.selectedWaypoint.altitude = $event">
+			</td>
+		</tr>
+		<tr>
+			<td>
+				<label>Bearing:</label><input [ngModel]="this._flightplanViewModel.selectedWaypoint.orientation" (ngModelChange)="this._flightplanViewModel.selectedWaypoint.orientation = $event">
+
+			</td>
+			<td>
+				<label>Radius:</label><input [ngModel]="this._flightplanViewModel.selectedWaypoint.radius" (ngModelChange)="this._flightplanViewModel.selectedWaypoint.radius = $event">
+			</td>
+			<td>
+				<button class="dashboard-card-item" (click)="this._flightplanViewModel.updateSelectedWaypoint()">Update waypoint</button>
+			</td>
+		</tr>
+
+	</table>
+</div>
+
+<hr>
+
+<div>Visualization Options</div>
+
+<table>
 	<tr>
 		<td>
-			Velocity
+			<p-checkbox label="Draw waypoint properties" [(ngModel)]="this._flightplanViewModel.drawWaypointsOn" binary="true"></p-checkbox>
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._velocities" [(ngModel)]="this._flightplanViewModel.selectedVelocity"></p-dropdown> [m/s]
+			<p-checkbox label="Draw touch-down marker" [(ngModel)]="this._flightplanViewModel.drawTouchdownOn" binary="true"></p-checkbox>
 		</td>
 		<td>
-			Hold time at WPs
-		</td>
-		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._holdTimes" [(ngModel)]="this._flightplanViewModel.selectedHoldTime"></p-dropdown> [s]
+			<p-checkbox label="Draw take-off marker" [(ngModel)]="this._flightplanViewModel.drawTakeoffOn" binary="true"></p-checkbox>
 		</td>
 	</tr>
+</table>
+
+<table>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="generateMavlink()">Generate mavlink code</button>
+			<button class="dashboard-card-item" (click)="addMosquitoMarker()">Add Mosquito marker</button>
 		</td>
 		<td>
 
 		</td>
 		<td>
-			<button class="dashboard-card-item" (click)="saveFlightplan()">Download mission</button>
+
 		</td>
 		<td>
 
 		</td>
 	</tr>
 </table>
+
+<hr>
+
+<div>Post-processing / Generate Mavlink Output</div>
+<ul>
+	<li>Set the flight velocity and the time in seconds the vehicle shall wait at each waypoint.</li>
+	<li> Generate the mavlink code. </li>
+	<li>Then save the flight plan as a *.mavlink file by downloading the mission code.</li>
+</ul>
+<table>
+	<tr>
+		<td>
+			Velocity
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._velocities" [(ngModel)]="this._selectedVelocity"></p-dropdown> [m/s]
+		</td>
+		<td>
+			Hold time at WPs
+		</td>
+		<td>
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._holdTimes" [(ngModel)]="this._selectedHoldTime"></p-dropdown> [s]
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<button class="dashboard-card-item" (click)="generateMavlink()">1: Generate mavlink code</button>
+		</td>
+		<td>
+
+		</td>
+		<td>
+			<button class="dashboard-card-item" (click)="saveFlightplan()">2: Download mission</button>
+		</td>
+		<td>
+
+		</td>
+	</tr>
+</table>
+
+<hr>
+
+<div>Under Construction ...</div>
+
 <table>
 	<tr>
 		<td>
@@ -127,18 +224,8 @@
 		<td>
 			<button class="dashboard-card-item" (click)="createOffsetCurves()">Create offset curves</button>
 		</td>
-		<td>
-			<p-checkbox label="Draw waypoint properties" [(ngModel)]="this._flightplanViewModel.drawWaypointsOn" binary="true"></p-checkbox>
-		</td>
-		<td>
-			<p-checkbox label="Draw touch-down marker" [(ngModel)]="this._flightplanViewModel.drawTouchdownOn" binary="true"></p-checkbox>
-		</td>
-		<td>
-			<p-checkbox label="Draw take-off marker" [(ngModel)]="this._flightplanViewModel.drawTakeoffOn" binary="true"></p-checkbox>
-		</td>
 	</tr>
 </table>
-
 
 <a style="display: none">
 </a>
