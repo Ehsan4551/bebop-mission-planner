@@ -2,10 +2,12 @@ import { Component, ViewChild, ElementRef } from '@angular/core';
 import { OnInit } from '@angular/core';
 import { Observable } from 'rxjs/Observable';
 import { Message } from 'primeng/primeng';
+import { CheckboxModule } from 'primeng/primeng';
 import { DropdownModule } from 'primeng/primeng';
 import { SelectItem } from 'primeng/primeng';
 import { FileUploadModule } from 'primeng/primeng';
 import { Flightplan, Waypoint } from './flightplan';
+import { FlightplanViewModel } from './flightplan-view-model';
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
 import * as fileSaver from "file-saver";
 
@@ -23,10 +25,6 @@ import { FlightpathDefinition } from './flightpath-definition';
 
 // Polygon offset
 let Offset = require('polygon-offset');
-
-// Geolib
-let geolib = require('geolib');
-
 
 @Component({
     selector: 'mission-planner',
@@ -46,49 +44,30 @@ export class PlannerComponent implements OnInit {
     private _map: L.Map = null;
     private _mapLayers: LayerItem[] = [];
 
-    // FlightpathDefinition
-    private _polygonDrawer = null;
-    private _flightlevelPointsDrawer = null;
-    private _addingEnvelope: boolean = false;
-    private _addingFlightLevelPoints: boolean = false;
+    // The flightpath definition model (from which a flightplan trajectory can be derived like offset curves from polygon)
+    // private _flightpathDefinition: FlightpathDefinition = new FlightpathDefinition();
 
-    // 'ViewModel' Data of flightpath definition
-    private _polygon = null; // a L.Polygon
-    private _flightLevelPoints = []; // array of L.Marker
-    private _selectedFlightLevelPoint = null; // a L.Marker from above array
-
-    // The flightpath definiton.
-    private _flightpathDefinition: FlightpathDefinition = new FlightpathDefinition();
-
-    private _drawnItems = L.featureGroup(); // FeatureGroup is to store editable layers
-    private _flightplanPolyline: L.Polyline = null;
-    private _flightplanWaypoints: L.Circle[] = [];
-    private _flightplanBearings: L.Polyline[] = [];
-    private _flightplanMarkers: L.Marker[] = [];
-
+    // Flightplan model
     private _flightplan: Flightplan = null;
 
-    private _waypointDistances: SelectItem[] = [];
-    private _selectedWaypointDistance: number = 5;
-    private _bearings: SelectItem[] = [];
-    private _selectedBearing: number = 0;
-    private _waypointRadii: SelectItem[] = [];
-    private _selectedWaypointRadius: number = 2;
-    private _altitudes: SelectItem[] = [];
-    private _selectedAltitude = 8;
-    private _selectedFlightLevelDefaultAltitude = 8;
+    // Flightplan view model
+    private _flightplanViewModel: FlightplanViewModel = null;
+
+    // Data which is input to a postprocessor instance
     private _velocities: SelectItem[] = [];
     private _selectedVelocity = 2;
     private _holdTimes: SelectItem[] = [];
     private _selectedHoldTime: number = 1;
 
-    private _tagFlightLevelPoint: string = 'flight-level-point';
-    private _tagFlightEnvelope: string = 'flight-envelope-polygon';
-    private _tagFlightplanPolyline: string = 'flight-plan-polyline';
+    // Drop down options
+    private _waypointDistances: SelectItem[] = [];
+    private _waypointRadii: SelectItem[] = [];
+    private _bearings: SelectItem[] = [];
+    private _altitudes: SelectItem[] = [];
 
     constructor() {
-
-        this.addDropdownOptions();
+        this.addFlightplanDropdownOptions();
+        this.addPostprocessorDropdownOptions();
     }
 
     ngOnInit(): void {
@@ -96,83 +75,33 @@ export class PlannerComponent implements OnInit {
         // Create a map instance
         this._map = L.map('mapid').setView([47.468722, 8.274975], 15);
 
-        // Leaflet-draw =============================================
+        // Create a flightplan view model
+        this._flightplanViewModel = new FlightplanViewModel(this._flightplan, this._map);
 
-        this._map.addLayer(this._drawnItems);
-        //this._drawnItems.addTo(this._map);
+        // Create the Leaflet Draw control toolbar on the map
         let drawControl = new L.Control.Draw({
             edit: {
-                featureGroup: this._drawnItems
+                featureGroup: this._flightplanViewModel.featureGroup
             }
         });
         this._map.addControl(drawControl);
 
-        // If clicking on one of the features drawn with leaflet-draw.
-        this._drawnItems.on('click', (e: any) => {
-            let layer = e.layer;
-            console.log('clicked, tag: ' + JSON.stringify(layer.tag));
-            if (layer.hasOwnProperty("tag")) {
-                // If clicking on the flight envelope polygon
-                if (layer.tag == this._tagFlightEnvelope) {
-                    this.toggleEditFlightPolygon(layer);
-                }
-                // If clicking on a flight level point
-                else if (layer.tag == this._tagFlightLevelPoint) {
-                    this.toggleEditFlightLevelPoint(layer);
-                }
-                else if (layer.tag == this._tagFlightplanPolyline){
-                    console.log('called edit');
-                    this.toggleEditFlightplan();
-                }
-            }
-        });
-
-        // Create a polygon 'handler'
-        this._polygonDrawer = new L.Draw.Polygon(this._map);
-
-        // Create point 'handler'
-        this._flightlevelPointsDrawer = new L.Draw.Marker(this._map);
-        this._flightlevelPointsDrawer.options.repeatMode = true;
-
-        // this._map.on('click', (e: any) => {
-        //     console.log("I was clicked: " + e.latlng.toString());
-        // });
-
+        // When things are drawn with the drawer objects.
         this._map.on(L.Draw.Event.CREATED, (e: any) => {
             let type = e.layerType;
-            let layer = e.layer; // a layer is a shape e.g. Polyline
+            let layer = e.layer; // a layer is a shape e.g. a Polyline
             if (type === 'marker') {
-                if (this._addingFlightLevelPoints) {
-                    layer.altitude = this._selectedFlightLevelDefaultAltitude; // add an altitude attribute ... hey, it's JS after all, so who cares?
-                    layer.tag = this._tagFlightLevelPoint; // add a tag, so later we know what this is
-                    layer.bindTooltip("Altitude: " + layer.altitude.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
-                    layer.index = this._flightLevelPoints.length;
-                    layer.on('mouseover', () => { // update the content of the tooltip on mouseover
-                        if (layer._tooltip) { // TODO: don't access private member
-                            layer._tooltip.setContent("Altitude: " + layer.altitude.toString());
-                        }
-                    });
-                    this._flightLevelPoints.push(layer);
-                    this.updateFlightLevelPoints();
+                if (this._flightplanViewModel.addingFlightLevelPoints) {
+                    this._flightplanViewModel.addFlightLevelPoint(layer);
                 }
             }
             else if (type === 'polygon') {
-                // Setting newly drawn flightpath envelope polygon
-                if (this._addingEnvelope) {
-                    this._addingEnvelope = false;
-                    // remove old polygon from map
-                    this.removeFlightPolygon();
-                    // store new polygon
-                    this._polygon = layer;
-                    this._polygon.tag = this._tagFlightEnvelope; // add a tag, so later we know what this is.
-                    // add points of new polygon to flightpath definition.
-                    this.updateFlightEnvelope(layer, this._flightpathDefinition);
+                if (this._flightplanViewModel.addingEnvelope) {
+                    this._flightplanViewModel.addEnvelope(layer);
                 }
             }
-            this._drawnItems.addLayer(layer);
+            this._flightplanViewModel.featureGroup.addLayer(layer);
         });
-
-        // Eof Leaflet-draw =============================================
 
         // Google map imagery layer
         this._mapLayers.push({
@@ -201,111 +130,6 @@ export class PlannerComponent implements OnInit {
         // Use the first array entry as the default map
         this._mapLayers[0].value.addTo(this._map);
 
-
-    }
-
-    // ==================== Drawing Flightpath definition ===================
-
-
-    toggleAddFlightLevelPoints(): void {
-        // start adding points
-        if (!this._addingFlightLevelPoints) {
-            this._flightlevelPointsDrawer.enable();
-            this._addingFlightLevelPoints = true;
-        }
-        // stop adding points
-        else {
-            this._addingFlightLevelPoints = false;
-            this._flightlevelPointsDrawer.disable();
-        }
-    }
-
-    removeFlightLevelPoints(): void {
-        this._flightLevelPoints.forEach((flp) => {
-            flp.remove();
-            flp = null;
-        });
-        this._flightLevelPoints = [];
-        this.updateFlightLevelPoints();
-    }
-
-    disableEditAllFlightLevelPoints(): void {
-        this._flightLevelPoints.forEach((flp) => {
-            flp.editing.disable();
-        })
-    }
-
-    /**
-     * Edit the passed marker.
-     * @param marker a leaflet L.Marker representing a flight level point.
-     */
-    toggleEditFlightLevelPoint(marker: any): void {
-        if (marker && !marker.editing.enabled()) {
-            this.disableEditAllFlightLevelPoints(); // disable editing for all flight level points first
-            marker.editing.enable();
-            this._selectedFlightLevelPoint = marker;
-        }
-        else if (marker && marker.editing.enabled()) {
-            marker.editing.disable();
-            this._selectedFlightLevelPoint = null;
-            this.updateFlightLevelPoints();
-        }
-        else {
-            this.showError("No flight level point selected.");
-        }
-    }
-
-    /**
-     * Called when flight level point data changed, point data including altitude.
-     */
-    updateFlightLevelPoints(): void {
-        // TODO: update the flightpath definition here
-        // - generate delaunay triangulation and draw it
-        // - add triangle coordinates to flightpath definitinon
-        console.log('Flight level point data changed!');
-    }
-
-    /**
-    * Start drawing a polygon for the flight path definition.
-    */
-    addFlightPolygon(): void {
-        this.removeFlightPolygon()
-        this._polygonDrawer.enable();
-        this._addingEnvelope = true;
-    }
-
-    /**
-     * Edit the polygon of the flight path definition.
-     * @param polygon a leaflet L.Polygon representing the flight envelope.
-     */
-    toggleEditFlightPolygon(polygon: any): void {
-        // Start editing
-        if (polygon && !polygon.editing.enabled()) {
-            polygon.editing.enable();
-            polygon.setStyle({ color: 'yellow' });
-        }
-        // Stop editing
-        else if (polygon && polygon.editing.enabled()) {
-            polygon.editing.disable();
-            polygon.setStyle({ color: '#3388ff' });
-            this.updateFlightEnvelope(polygon, this._flightpathDefinition);
-        }
-        // Cannot edit if no envelope created
-        else {
-            this.showError("No flight path envelope selected. Create one first.");
-        }
-    }
-
-    /**
-     * Remove the current flight path definition polygon.
-     */
-    removeFlightPolygon(): void {
-        if (this._polygon) {
-            this._polygon.editing.disable();
-            this._polygon.remove();
-            this._polygon = null;
-            this.updateFlightEnvelope(this._polygon, this._flightpathDefinition);
-        }
     }
 
     // Geneating flight path stuff
@@ -355,7 +179,7 @@ export class PlannerComponent implements OnInit {
         this.readMavlinkFile(this.mavlinkFileDialogElement.nativeElement).subscribe(
             (flightplan: Flightplan) => {
                 this._flightplan = flightplan;
-                this.drawFlightplan(this._flightplan, this._map);
+                this._flightplanViewModel.resetFlightplan(flightplan);
             },
             (error) => {
                 console.log(error);
@@ -383,7 +207,7 @@ export class PlannerComponent implements OnInit {
                         console.error(msg);
                         observer.error(msg);
                     }
-                }
+                };
                 reader.onerror = (err) => {
                     this.resetInputFileElement(this.mavlinkFileDialogElement.nativeElement, this._loadMavlinkLabel);
                     let msg: string = 'FileReader error. ' + err.message;
@@ -400,7 +224,7 @@ export class PlannerComponent implements OnInit {
         this.readKmzFile(this.kmzFileDialogElement.nativeElement).subscribe(
             (flightplan: Flightplan) => {
                 this._flightplan = flightplan;
-                this.drawFlightplan(this._flightplan, this._map);
+                this._flightplanViewModel.resetFlightplan(flightplan);
             },
             (error) => {
                 console.log(error);
@@ -428,7 +252,7 @@ export class PlannerComponent implements OnInit {
                         // process file content
                         let content: string = reader.result;
                         let fp = new Flightplan();
-                        fp.parseKmz(content, flightplanName, this._selectedBearing, this._selectedWaypointRadius);
+                        fp.parseKmz(content, flightplanName, this._flightplanViewModel.selectedBearing, this._flightplanViewModel.selectedWaypointRadius);
                         this.resetInputFileElement(this.kmzFileDialogElement.nativeElement, this._loadKmzLabel);
                         console.log('Read flightplan (kmz): ' + JSON.stringify(fp));
                         observer.next(fp);
@@ -475,8 +299,7 @@ export class PlannerComponent implements OnInit {
     addIntermediateWaypoints() {
         try {
             if (this._flightplan) {
-                this._flightplan.addWaypoints(this._selectedWaypointDistance); // add waypoints every x meters
-                this.drawFlightplan(this._flightplan, this._map);
+                this._flightplan.addWaypoints(this._flightplanViewModel.selectedWaypointDistance); // add waypoints every x meters
             }
             else {
                 this.showError('No mission loaded');
@@ -491,8 +314,7 @@ export class PlannerComponent implements OnInit {
     setWaypointRadius() {
         try {
             if (this._flightplan) {
-                this._flightplan.setWaypointRadius(this._selectedWaypointRadius);
-                this.drawFlightplan(this._flightplan, this._map);
+                this._flightplan.setWaypointRadius(this._flightplanViewModel.selectedWaypointRadius);
             }
             else {
                 this.showError('No mission loaded');
@@ -507,8 +329,7 @@ export class PlannerComponent implements OnInit {
     setAltitude(altitude: number) {
         try {
             if (this._flightplan) {
-                this._flightplan.setAltitude(this._selectedAltitude);
-                this.drawFlightplan(this._flightplan, this._map);
+                this._flightplan.setAltitude(this._flightplanViewModel.selectedAltitude);
             }
             else {
                 this.showError('No mission loaded');
@@ -523,8 +344,7 @@ export class PlannerComponent implements OnInit {
     setBearing(bearing: number) {
         try {
             if (this._flightplan) {
-                this._flightplan.setBearing(this._selectedBearing);
-                this.drawFlightplan(this._flightplan, this._map);
+                this._flightplan.setBearing(this._flightplanViewModel.selectedBearing);
             }
             else {
                 this.showError('No mission loaded');
@@ -540,7 +360,6 @@ export class PlannerComponent implements OnInit {
         try {
             if (this._flightplan) {
                 this._flightplan.setBearingToCenter();
-                this.drawFlightplan(this._flightplan, this._map);
             }
             else {
                 this.showError('No mission loaded');
@@ -589,134 +408,6 @@ export class PlannerComponent implements OnInit {
         }
     }
 
-
-    // =============================================
-
-    private drawFlightplan(flightplan: Flightplan, map: L.Map): void {
-
-        // Remove any previous flightplan drawing from the map.
-        if (this._flightplanPolyline) {
-            this._flightplanPolyline.remove();
-            this._flightplanPolyline = null;
-        }
-        this._flightplanWaypoints.forEach((wp) => {
-            wp.remove();
-            wp = null;
-        });
-        this._flightplanWaypoints = [];
-        this._flightplanBearings.forEach((bb) => {
-            bb.remove();
-            bb = null;
-        });
-        this._flightplanBearings = [];
-        this._flightplanMarkers.forEach((mm) => {
-            mm.remove();
-            mm = null;
-        });
-        this._flightplanMarkers = [];
-
-        // Render new flight plan if a valid one was passed.
-        // if (flightplan && flightplan.isValid) {
-        if (flightplan) {
-
-            // Create array of LatLng from flightplan waypoints
-            let lla: L.LatLng[] = [];
-
-            // Take-off position
-            lla.push(L.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude, 0));
-
-            // waypoints
-            flightplan.waypoints.forEach(wp => {
-                lla.push(L.latLng(wp.latitude, wp.longitude, 0));
-            });
-
-            // Touchdown position
-            lla.push(L.latLng(flightplan.touchDownPosition.latitude, flightplan.touchDownPosition.longitude, 0));
-
-            // Add the polyline to the map
-            this._flightplanPolyline = L.polyline(lla, { color: "red", lineJoin: "round", lineCap: "butt" }); // .addTo(this._map);
-            (<any>this._flightplanPolyline).tag = this._tagFlightplanPolyline; // add a tag, so later we know what this is
-            this._drawnItems.addLayer(this._flightplanPolyline);
-
-            // Add a waypoint radius for each waypoint
-            for (let i = 0; i < flightplan.numWaypoints; i++) {
-                let wp: Waypoint = flightplan.waypoints[i];
-                let center = new L.LatLng(wp.latitude, wp.longitude);
-                this._flightplanWaypoints.push(L.circle(center, wp.radius).addTo(this._map));
-            }
-
-            // Add bearing indicator for each waypoint
-            for (let i = 0; i < flightplan.numWaypoints; i++) {
-                let wp: Waypoint = flightplan.waypoints[i];
-                let endpoint = geolib.computeDestinationPoint(wp, wp.radius * 2.0, wp.orientation);
-                console.log('wp: ' + JSON.stringify(wp));
-                console.log('end: ' + JSON.stringify(endpoint));
-                let line: L.LatLng[] = [];
-                line.push(L.latLng(wp.latitude, wp.longitude));
-                line.push(L.latLng(endpoint.latitude, endpoint.longitude));
-                this._flightplanBearings.push(L.polyline(line, { color: "yellow", lineJoin: "round", lineCap: "butt" }).addTo(this._map));
-            }
-
-            // Add altitude markers 
-            for (let i = 0; i < flightplan.numWaypoints; i++) {
-                let wp: Waypoint = flightplan.waypoints[i];
-                let endpoint = geolib.computeDestinationPoint(wp, wp.radius * 2.0, wp.orientation);
-                console.log('wp: ' + JSON.stringify(wp));
-                console.log('end: ' + JSON.stringify(endpoint));
-                let center: L.LatLng = L.latLng(wp.latitude, wp.longitude);
-                let marker = L.marker([wp.latitude, wp.longitude], { opacity: 0.01 }); //opacity may be set to zero
-                marker.bindTooltip("WP: " + i.toString() + ", Altitude: " + wp.altitude.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
-                this._flightplanMarkers.push(marker.addTo(this._map));
-            }
-
-            // Center map on take-off location
-            this._map.panTo(L.latLng(flightplan.takeOffPosition.latitude, flightplan.takeOffPosition.longitude));
-        }
-    }
-
-    toggleEditFlightplan(): void {
-        if (this._flightplanPolyline && (<any>this._flightplanPolyline).editing.enabled()) {
-            (<any>this._flightplanPolyline).editing.disable();
-            // Update the flightplan
-            //this.updateFlightpath() // todo  write flightplan polyline into flightplan with setFlightpath
-        }
-        else if (this._flightplanPolyline && !(<any>this._flightplanPolyline).editing.enabled()) {
-            (<any>this._flightplanPolyline).editing.enable();
-        }
-        else {
-            this.showError("No flight level point selected.");
-        }
-    }
-
-    updateFlightEnvelope(layer, fpd: FlightpathDefinition): void {
-        if (layer == null) {
-            fpd.clearEnvelope();
-            console.log('Flight envelope coordinate array: ' + '[[]]');
-            return;
-        }
-        // add here the coordinates of the polygon to the flightpath definition
-        // getLatLngs is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
-        // we expect only 1 shape in this layer.                   
-        let latlngs = layer.getLatLngs(); // is a 2-d array of coordinates of shapes [[{"lat":47.47,"lng":8.2}, ...], [...]]
-        if (latlngs.length !== 1) {
-            this.showError("More than 1 polygon drawn.");
-        }
-        else {
-            latlngs.forEach((shape) => {
-                let points = [];
-                shape.forEach((latLng) => {
-                    points.push([latLng.lat, latLng.lng]);
-                });
-                // add the first as the last (required by polygon-offset)
-                if (points.length > 0) {
-                    points.push([points[0][0], points[0][1]]);
-                }
-                console.log('Flight envelope coordinate array: ' + JSON.stringify(points));
-                fpd.envelope = points;
-            });
-        }
-    }
-
     hotkeys(event) {
         // // ALT + t
         // if (event.keyCode === 84 && event.altKey) {
@@ -734,7 +425,8 @@ export class PlannerComponent implements OnInit {
         this._msgs.push({ severity: 'success', summary: 'Success', detail: message });
     }
 
-    private addDropdownOptions(): void {
+    addFlightplanDropdownOptions(): void {
+
         this._waypointDistances.push({ label: '1', value: 1 });
         this._waypointDistances.push({ label: '2', value: 2 });
         this._waypointDistances.push({ label: '3', value: 3 });
@@ -771,6 +463,9 @@ export class PlannerComponent implements OnInit {
         this._altitudes.push({ label: '18', value: 18 });
         this._altitudes.push({ label: '20', value: 20 });
         this._altitudes.push({ label: '25', value: 25 });
+    }
+
+    addPostprocessorDropdownOptions(): void {
 
         this._velocities.push({ label: '1', value: 1 });
         this._velocities.push({ label: '2', value: 2 });

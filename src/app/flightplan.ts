@@ -1,4 +1,6 @@
-import { EventEmitter } from 'events';
+import { Observable } from 'rxjs/Observable';
+import { Subject } from 'rxjs/Subject';
+
 let geolib = require('geolib');
 
 /**
@@ -44,7 +46,7 @@ export class Waypoint {
  * Flight plan.
  * The flightplan implementation must ensure that it can be completely constructed from its mavlink representation.
  */
-export class Flightplan extends EventEmitter {
+export class Flightplan {
 
     private _name: string = '';
     private _mavlink: string = '';
@@ -52,17 +54,53 @@ export class Flightplan extends EventEmitter {
     private _touchDownPosition: Waypoint = null;
     private _waypoints: Waypoint[] = []; // array of Positions without take-off and touch-down posititions (cmds '22', '21')
 
+    // Obserables on the flightplan state
+    private _obsOnChange: Subject<void> = new Subject<void>();
+    private _obsName: Subject<string> = new Subject<string>();
+    private _obsMavlink: Subject<string> = new Subject<string>();
+    private _obsTakeOffPosition: Subject<Waypoint> = new Subject<Waypoint>();
+    private _obsTouchDownPosition: Subject<Waypoint> = new Subject<Waypoint>();
+    private _obsWaypoints: Subject<Waypoint[]> = new Subject<Waypoint[]>();
     /**
      * Construct a flight plan instance. Can throw an error if parsing mavlink fails
      * @param mavlink If present, parseMavlink is called by the constructor, otherwise an 
      * empty (equal to a cleared) and invalid flight plan is created.
      */
     constructor(mavlink?: string) {
-        super();
         this.clear();
         if (mavlink) {
             this.parseMavlink(mavlink);
         }
+    }
+
+    /**
+     * A non-specified change to the flightplan occured.
+     */
+    public onChangeObs(): Observable<void> {
+        return this._obsOnChange;
+    }
+
+    public nameObs(): Observable<string> {
+        return this._obsName;
+    }
+
+    public mavlinkObs(): Observable<string> {
+        return this._obsMavlink;
+    }
+
+    /**
+     * Take-off position changed.
+     */
+    public takeOffPositionObs(): Observable<Waypoint> {
+        return this._obsTakeOffPosition;
+    }
+
+    public touchDownPositionObs(): Observable<Waypoint> {
+        return this._obsTouchDownPosition;
+    }
+
+    public waypointsObs(): Observable<Waypoint[]> {
+        return this._obsWaypoints;
     }
 
     /**
@@ -198,6 +236,7 @@ export class Flightplan extends EventEmitter {
         });
         this._takeOffPosition.radius = radius;
         this._touchDownPosition.radius = radius;
+        this._obsOnChange.next(); // notify about change
     }
 
     /**
@@ -210,6 +249,7 @@ export class Flightplan extends EventEmitter {
         });
         this._takeOffPosition.altitude = altitude;
         this._touchDownPosition.altitude = altitude;
+        this._obsOnChange.next(); // notify about change
     }
 
     /**
@@ -222,6 +262,7 @@ export class Flightplan extends EventEmitter {
         });
         this._takeOffPosition.orientation = bearing;
         this._touchDownPosition.orientation = bearing;
+        this._obsOnChange.next(); // notify about change
     }
 
     /**
@@ -236,21 +277,43 @@ export class Flightplan extends EventEmitter {
             wp.orientation = bearing;
             console.log('Set bearing to: ' + bearing);
         });
+        this._obsOnChange.next(); // notify about change
     }
 
     /**
      * Set the flight path.
      * Erases any previously generated internal mavlink representation.
      */
-    setFlightpath(path: Waypoint[], takeoff: Waypoint, touchdown: Waypoint) {
-        if (path && path.length != 0 && takeoff && touchdown) {
+    setWaypoints(path: Waypoint[]) {
+        if (path && path.length !== 0) {
             this._mavlink = "";
             this._waypoints = path;
-            this._takeOffPosition = takeoff;
-            this._touchDownPosition = touchdown;
+            this._obsWaypoints.next(this._waypoints);
         }
         else {
-            throw new Error("Invalid flightpath data passed to Flightplan.setFlightpath()");
+            throw new Error("Invalid waypoint data passed to Flightplan.setWaypoints()");
+        }
+    }
+
+    setTakeoff(pos: Waypoint): void {
+        if (pos) {
+            this._mavlink = "";
+            this._takeOffPosition = pos;
+            this._obsTakeOffPosition.next(this._takeOffPosition);
+        }
+        else {
+            throw new Error("Invalid takeoff data passed to Flightplan.setTakeoff()");
+        }
+    }
+
+    setTouchdown(pos: Waypoint): void {
+        if (pos) {
+            this._mavlink = "";
+            this._touchDownPosition = pos;
+            this._obsTouchDownPosition.next(this._touchDownPosition);
+        }
+        else {
+            throw new Error("Invalid takeoff data passed to Flightplan.setTouchdown()");
         }
     }
 
@@ -303,6 +366,7 @@ export class Flightplan extends EventEmitter {
             }
         }
         this._waypoints.push(oldWps[oldWps.length - 1]); // add last existing waypoint of last leg (length-1)
+        this._obsWaypoints.next(this._waypoints);
     }
 
     /**
@@ -379,17 +443,21 @@ export class Flightplan extends EventEmitter {
             console.log('An error occurred in parseMavlink()');
             console.log(JSON.stringify(err));
             console.log("Received flightplan string was:\n" + flightplan);
+            this._obsOnChange.next(); // notify about change
             throw (err);
         }
 
         // Do some checks
         if (this._name === '') {
+            this._obsOnChange.next(); // notify about change
             throw new Error('Could not extract valid flight plan from passed mavlink code. No name specified.');
         }
         if (!this.isValid) {
             // if not valid for other reasons
+            this._obsOnChange.next(); // notify about change
             throw new Error('Could not extract valid flight plan from passed mavlink code.');
         }
+        this._obsOnChange.next(); // notify about change
     }
 
 
@@ -468,8 +536,10 @@ export class Flightplan extends EventEmitter {
             console.log('An error occurred in parseKmz()');
             console.log(JSON.stringify(err));
             console.log("Received kmz string was:\n" + kmz);
+            this._obsOnChange.next(); // notify about change
             throw (err);
         }
+        this._obsOnChange.next(); // notify about change
     }
 
 }

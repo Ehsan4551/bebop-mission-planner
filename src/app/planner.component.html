@@ -27,13 +27,13 @@
 			<button class="dashboard-card-item" (click)="addIntermediateWaypoints()">Add waypoints</button>
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointDistances" [(ngModel)]="this._selectedWaypointDistance"></p-dropdown> [m]
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointDistances" [(ngModel)]="this._flightplanViewModel.selectedWaypointDistance"></p-dropdown> [m]
 		</td>
 		<td>
 			<button class="dashboard-card-item" (click)="setBearing()">Reset bearing</button>
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._bearings" [(ngModel)]="this._selectedBearing"></p-dropdown> [deg]
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._bearings" [(ngModel)]="this._flightplanViewModel.selectedBearing"></p-dropdown> [deg]
 		</td>
 	</tr>
 	<tr>
@@ -41,13 +41,13 @@
 			<button class="dashboard-card-item" (click)="setWaypointRadius()">Reset WP radius</button>
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointRadii" [(ngModel)]="this._selectedWaypointRadius"></p-dropdown> [m]
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._waypointRadii" [(ngModel)]="this._flightplanViewModel.selectedWaypointRadius"></p-dropdown> [m]
 		</td>
 		<td>
 			<button class="dashboard-card-item" (click)="setAltitude()">Reset altitude</button>
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedAltitude"></p-dropdown> [m]
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._flightplanViewModel.selectedAltitude"></p-dropdown> [m]
 		</td>
 	</tr>
 	<tr>
@@ -55,13 +55,13 @@
 			Velocity
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._velocities" [(ngModel)]="this._selectedVelocity"></p-dropdown> [m/s]
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._velocities" [(ngModel)]="this._flightplanViewModel.selectedVelocity"></p-dropdown> [m/s]
 		</td>
 		<td>
 			Hold time at WPs
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._holdTimes" [(ngModel)]="this._selectedHoldTime"></p-dropdown> [s]
+			<p-dropdown [style]="{'width':'100px', 'margin':'0px 0px 0px 0px'}" [options]="this._holdTimes" [(ngModel)]="this._flightplanViewModel.selectedHoldTime"></p-dropdown> [s]
 		</td>
 	</tr>
 	<tr>
@@ -82,7 +82,7 @@
 <table>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="addFlightPolygon()">Add envelope...</button>
+			<button class="dashboard-card-item" (click)="this._flightplanViewModel.addFlightPolygon()">Add envelope...</button>
 		</td>
 		<td>
 		</td>
@@ -90,33 +90,34 @@
 			<button class="dashboard-card-item" (click)="toggleEditFlightPolygon()">{{(this._polygon && this._polygon.editing.enabled()) ? "Stop editing" : "Edit envelope..."}}</button>
 		</td>-->
 		<td>
-			<button class="dashboard-card-item" (click)="removeFlightPolygon()">Remove envelope</button>
+			<button class="dashboard-card-item" (click)="this._flightplanViewModel.removeFlightPolygon()">Remove envelope</button>
 		</td>
 	</tr>
 	<tr>
 		<td>
-			<button class="dashboard-card-item" (click)="toggleAddFlightLevelPoints()">{{this._addingFlightLevelPoints ? "Stop adding flight level points" : "Add flight level points..."}}</button>
+			<button class="dashboard-card-item" (click)="this._flightplanViewModel.toggleAddFlightLevelPoints()">{{this._flightplanViewModel.addingFlightLevelPoints ? "Stop adding flight level points" : "Add flight level points..."}}</button>
 		</td>
 		<td>
 			Altitude of next point
 		</td>
 		<td>
-			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelDefaultAltitude"></p-dropdown> [m]
+			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._flightplanViewModel.selectedFlightLevelDefaultAltitude"></p-dropdown> [m]
 		</td>
 		<td>
-			<button class="dashboard-card-item" (click)="removeFlightLevelPoints()">Remove flight level points</button>
+			<button class="dashboard-card-item" (click)="this._flightplanViewModel.removeFlightLevelPoints()">Remove flight level points</button>
 		</td>
 	</tr>
-	<tr *ngIf="this._selectedFlightLevelPoint">
+	<tr *ngIf="this._flightplanViewModel.selectedFlightLevelPoint">
 		<td>
-			Level point {{this._selectedFlightLevelPoint ? this._selectedFlightLevelPoint.index : "none"}}
+			Level point {{this._flightplanViewModel.selectedFlightLevelPoint ? this._flightplanViewModel.selectedFlightLevelPoint.index
+			: "none"}}
 		</td>
 		<td>
 			Set altitude
 		</td>
 		<td>
 			<!--<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" (onChange)="updateFlightLevelPoints($event)" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelPoint.altitude"></p-dropdown> [m]-->
-			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._selectedFlightLevelPoint.altitude"></p-dropdown> [m]
+			<p-dropdown [style]="{'width':'80px', 'margin':'0px 0px 0px 0px'}" [options]="this._altitudes" [(ngModel)]="this._flightplanViewModel.selectedFlightLevelPoint.altitude"></p-dropdown> [m]
 		</td>
 	</tr>
 </table>
@@ -125,6 +126,15 @@
 	<tr>
 		<td>
 			<button class="dashboard-card-item" (click)="createOffsetCurves()">Create offset curves</button>
+		</td>
+		<td>
+			<p-checkbox label="Draw waypoint properties" [(ngModel)]="this._flightplanViewModel.drawWaypointsOn" binary="true"></p-checkbox>
+		</td>
+		<td>
+			<p-checkbox label="Draw touch-down marker" [(ngModel)]="this._flightplanViewModel.drawTouchdownOn" binary="true"></p-checkbox>
+		</td>
+		<td>
+			<p-checkbox label="Draw take-off marker" [(ngModel)]="this._flightplanViewModel.drawTakeoffOn" binary="true"></p-checkbox>
 		</td>
 	</tr>
 </table>
