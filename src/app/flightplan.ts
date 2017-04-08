@@ -299,12 +299,12 @@ export class Flightplan {
      * Replace a specific waypoint.
      * Clones the waypoint.
      */
-    setWaypoint(wp: Waypoint, index: number){
-        if(index >= 0 && index < this._waypoints.length){
+    setWaypoint(wp: Waypoint, index: number) {
+        if (index >= 0 && index < this._waypoints.length) {
             this._waypoints[index] = wp.clone();
             this._obsWaypoints.next(this._waypoints);
         }
-        else{
+        else {
             throw new Error("Invalid waypoint index passed to setWaypoint()");
         }
     }

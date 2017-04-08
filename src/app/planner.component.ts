@@ -87,7 +87,7 @@ export class PlannerComponent implements OnInit {
                 this.showError(err);
             },
             () => { }
-        )
+        );
 
         // Register to receive view model error messages
         this._flightplanViewModel.warnings().subscribe(
@@ -98,7 +98,7 @@ export class PlannerComponent implements OnInit {
                 this.showWarning(err);
             },
             () => { }
-        )
+        );
 
         // Create the Leaflet Draw control toolbar on the map
         let drawControl = new L.Control.Draw({
