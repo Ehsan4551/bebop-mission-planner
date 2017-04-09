@@ -293,6 +293,11 @@ module.exports = function (options) {
         {
           from: 'node_modules/leaflet-draw/dist/images',
           to: 'assets/leaflet/images'
+        },
+        // Scripts
+        {
+          from: 'src/scripts/start.bat',
+          to: 'start.bat'
         }
       ]),
 
