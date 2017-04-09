@@ -63,13 +63,8 @@
 
 <div *ngIf="this._flightplanViewModel.selectedWaypointIndex > -1">
 	<hr>
-	<div>Edit Single Waypoint</div>
+	<div>Edit Waypoint {{this._flightplanViewModel.selectedWaypointIndex}}</div>
 	<table>
-		<tr>
-			<td>
-				Waypoint index: {{this._flightplanViewModel.selectedWaypointIndex}}
-			</td>
-		</tr>
 		<tr>
 			<td>
 				<label>Lat:</label><input [ngModel]="this._flightplanViewModel.selectedWaypoint.latitude" (ngModelChange)="this._flightplanViewModel.selectedWaypoint.latitude = $event">
@@ -133,6 +128,25 @@
 
 	</tr>
 </table>
+
+<div *ngIf="this._flightplanViewModel.selectedPointOfInterestIndex > -1">
+	<hr>
+	<div>Edit Point of Interest {{this._flightplanViewModel.selectedPointOfInterestIndex}}</div>
+	<table>
+		<tr>
+			<td>
+				<label>Lat:</label><input [ngModel]="this._flightplanViewModel.selectedPointOfInterest.lat" (ngModelChange)="this._flightplanViewModel.selectedPointOfInterest.lat = $event">
+
+			</td>
+			<td>
+				<label>Lng:</label><input [ngModel]="this._flightplanViewModel.selectedPointOfInterest.lng" (ngModelChange)="this._flightplanViewModel.selectedPointOfInterest.lng = $event">
+			</td>
+			<td>
+				<button class="dashboard-card-item" (click)="this._flightplanViewModel.updateSelectedPointOfInterest()">Update point of interest</button>
+			</td>
+		</tr>
+	</table>
+</div>
 
 <hr>
 

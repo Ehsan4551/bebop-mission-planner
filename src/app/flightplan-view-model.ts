@@ -41,6 +41,9 @@ export class FlightplanViewModel {
     public newPointOfInterestLongitude: number = 8;
     private _pointsOfInterestMarkers: L.Marker[] = [];
     private _iconPointOfInterest = null;
+    private _iconPointOfInterestHighlighted = null;
+    private _selectedPointOfInterestIndex: number = -1; // none
+    private _selectedPointOfInterest: L.LatLng = null;
 
     // Flight level
     private _flightLevelPoints = []; // array of L.Marker
@@ -122,6 +125,12 @@ export class FlightplanViewModel {
             iconAnchor: [14, 14],
             popupAnchor: [-3, -76]
         });
+        this._iconPointOfInterestHighlighted = L.icon({
+            iconUrl: 'assets/img/star-highlited.png',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor: [-3, -76]
+        });
 
         // If clicking on one of the features drawn with leaflet-draw.
         this._drawnItems.on('click', (e: any) => {
@@ -144,6 +153,9 @@ export class FlightplanViewModel {
                 }
                 else if (layer.tag === this._tagWaypointCircle) {
                     this.toggleEditWaypoint(layer.index);
+                }
+                else if (layer.tag == this._tagPointOfInterest) {
+                    this.toggleEditPointOfInterest(layer.index);
                 }
             }
         });
@@ -283,6 +295,16 @@ export class FlightplanViewModel {
         return this._selectedWaypoint;
     }
 
+    /**
+     * Is -1 if none is selected.
+     */
+    get selectedPointOfInterestIndex() {
+        return this._selectedPointOfInterestIndex;
+    }
+
+    get selectedPointOfInterest(): L.LatLng {
+        return this._selectedPointOfInterest;
+    }
 
     private redrawFlightplanTakeoffPosition(): void {
         if (this._flightplanTakeoffMarker) {
@@ -320,15 +342,18 @@ export class FlightplanViewModel {
         });
         this._pointsOfInterestMarkers = [];
         // Add points of interest markers
-        this._flightplan.pointsOfInterest.forEach((poi) => {
-            console.log('poi: ' + poi.lat + ' ' + poi.lng);
+        for (let i = 0; i < this._flightplan.pointsOfInterest.length; i++) {
+            let poi: L.LatLng = this._flightplan.pointsOfInterest[i];
             let m = L.marker([poi.lat, poi.lng], { icon: this._iconPointOfInterest });
+            if (i === this._selectedPointOfInterestIndex) {
+                m.setIcon(this._iconPointOfInterestHighlighted); // set to highlighted style
+            }
             m.tag = this._tagPointOfInterest; // add a tag, so later we know what this is
+            m.index = this._pointsOfInterestMarkers.length;
+            m.bindTooltip("POI: " + m.index.toString() + ", Lat: " + poi.lat.toString() + ", Lng: " + poi.lng.toString(), { permanent: false, className: "my-label", offset: [0, 0] });
             this._pointsOfInterestMarkers.push(m);
             this._drawnItems.addLayer(m);
-            // TODO, continue from here (what's missing in drawing markers?)
-            // All working fine? Need to be able to edit one?
-        });
+        };
 
     }
 
@@ -565,6 +590,7 @@ export class FlightplanViewModel {
                 }
                 // deselect
                 this._selectedWaypointIndex = -1;
+                this._selectedWaypoint = null;
             }
         }
         else {
@@ -574,7 +600,7 @@ export class FlightplanViewModel {
     }
 
     updateSelectedWaypoint() {
-        if (this._flightplan && this._selectedWaypointIndex > 0) {
+        if (this._flightplan && this._selectedWaypointIndex >= 0) {
             this._flightplan.setWaypoint(this._selectedWaypoint, this._selectedWaypointIndex); // clones the waypoint and emits waypoint observable next.
         }
     }
@@ -583,12 +609,55 @@ export class FlightplanViewModel {
         if (this._flightplan) {
             this._flightplan.addPointOfInterest(L.latLng(this.newPointOfInterestLatitude, this.newPointOfInterestLongitude));
         }
-        else{
+        else {
             this._obsErrors.next("No flight plan created yet.");
         }
-        // let poi = L.marker([this._flightplan.takeOffPosition.latitude, this._flightplan.takeOffPosition.longitude], { icon: this._iconTakeoff });
-        // (<any>this._flightplanTakeoffMarker).tag = this._tagTakeoffPoint; // add a tag, so later we know what this is
-        // this._drawnItems.addLayer(this._flightplanTakeoffMarker);
+    }
+
+    toggleEditPointOfInterest(index: number) {
+        if (this._flightplan &&
+            index >= 0 &&
+            index < this._flightplan.pointsOfInterest.length &&
+            index < this._pointsOfInterestMarkers.length) {
+
+            if (index !== this._selectedPointOfInterestIndex) {
+                // A new point has been selected
+
+                // remove highlight icon from previous selection
+                if (this._selectedPointOfInterestIndex >= 0) {
+                    this._pointsOfInterestMarkers[this._selectedPointOfInterestIndex].setIcon(this._iconPointOfInterest);
+                }
+
+                // store the newly selected index
+                this._selectedPointOfInterestIndex = index;
+
+                // store a copy of the selected point of interest
+                this._selectedPointOfInterest = L.latLng(this._flightplan.pointsOfInterest[index].lat, this._flightplan.pointsOfInterest[index].lng);
+
+                // Highlight new selection
+                this._pointsOfInterestMarkers[this._selectedPointOfInterestIndex].setIcon(this._iconPointOfInterestHighlighted);
+            }
+            else {
+                // The same point has been selected -> deselect
+                // remove highlight icon from previous selection
+                if (this._selectedPointOfInterestIndex >= 0) {
+                    this._pointsOfInterestMarkers[this._selectedPointOfInterestIndex].setIcon(this._iconPointOfInterest);
+                }
+                // deselect
+                this._selectedPointOfInterestIndex = -1;
+                this._selectedPointOfInterest = null;
+            }
+        }
+        else {
+            this._selectedWaypointIndex = -1;
+            this._obsErrors.next("Invalid waypoint index received for editing");
+        }
+    }
+
+    updateSelectedPointOfInterest() {
+        if (this._flightplan && this._selectedPointOfInterestIndex >= 0) {
+            this._flightplan.setPointOfInterest(this._selectedPointOfInterest, this._selectedPointOfInterestIndex); // clones the point of interest and emits poi observable next.
+        }
     }
 
     toggleAddFlightLevelPoints(): void {

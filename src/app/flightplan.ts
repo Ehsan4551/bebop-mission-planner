@@ -356,6 +356,21 @@ export class Flightplan {
     }
 
     /**
+     * Replace a specific point of interest.
+     * Clones the point of interest.
+     */
+    setPointOfInterest(poi: L.LatLng, index: number) {
+        console.log('setPointOfInterest index: ' + index);
+        if (index >= 0 && index < this._pointsOfInterest.length) {
+            this._pointsOfInterest[index] = L.latLng(poi.lat, poi.lng);
+            this._obsPointsOfInterest.next(this._pointsOfInterest);
+        }
+        else {
+            throw new Error("Invalid point of interest index passed to setPointOfInterest()");
+        }
+    }
+
+    /**
     * Add waypoints every stepSize meters to the waypoints of this flight path. Latitude, longitude and altitude is interpolated.
     *  Waypoint radius and bearing are taken from the previous waypoint of the respective leg.
     */
