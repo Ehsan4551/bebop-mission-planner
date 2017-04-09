@@ -36,10 +36,12 @@ export class PlannerComponent implements OnInit {
 
     @ViewChild('kmzFileDialog') kmzFileDialogElement: ElementRef; // https://angular.io/docs/js/latest/api/core/index/ElementRef-class.html
     @ViewChild('mavlinkFileDialog') mavlinkFileDialogElement: ElementRef; // https://angular.io/docs/js/latest/api/core/index/ElementRef-class.html
+    @ViewChild('jsonFileDialog') jsonFileDialogElement: ElementRef; // https://angular.io/docs/js/latest/api/core/index/ElementRef-class.html
 
     private _msgs: Message[] = [];
     private _loadKmzLabel: string = 'Load kmz file';
     private _loadMavlinkLabel: string = 'Load mavlink file';
+    private _loadJsonLabel: string = 'Load flight plan';
 
     private _map: L.Map = null;
     private _mapLayers: LayerItem[] = [];
@@ -180,6 +182,50 @@ export class PlannerComponent implements OnInit {
 
     // Add flight plan functionality ====================================
 
+    addJsonFile(inputElement: HTMLInputElement): void {
+        this.readJsonFile(this.jsonFileDialogElement.nativeElement).subscribe(
+            (flightplan: Flightplan) => {
+                this._flightplan = flightplan;
+                this._flightplanViewModel.resetFlightplan(flightplan);
+            },
+            (error) => {
+                console.log(error);
+                this.showError(error);
+            },
+            () => { }
+        );
+    }
+
+    readJsonFile(inputElement: HTMLInputElement): Observable<Flightplan> {
+        return Observable.create((observer) => {
+            if (this.isValidFileElement(inputElement)) {
+                let reader: FileReader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        let fp = new Flightplan();
+                        fp.fromJson(reader.result);
+                        this.resetInputFileElement(this.jsonFileDialogElement.nativeElement, this._loadJsonLabel);
+                        observer.next(fp);
+                        observer.complete();
+                    }
+                    catch (err) {
+                        this.resetInputFileElement(this.jsonFileDialogElement.nativeElement, this._loadJsonLabel);
+                        let msg: string = 'Could not parse json content. ' + err.message;
+                        console.error(msg);
+                        observer.error(msg);
+                    }
+                };
+                reader.onerror = (err) => {
+                    this.resetInputFileElement(this.jsonFileDialogElement.nativeElement, this._loadJsonLabel);
+                    let msg: string = 'FileReader error. ' + err.message;
+                    console.error(msg);
+                    observer.error(msg);
+                };
+                reader.readAsText(inputElement.files[0]);
+            }
+        });
+    }
+
     addMavlinkFile(inputElement: HTMLInputElement): void {
         this.readMavlinkFile(this.mavlinkFileDialogElement.nativeElement).subscribe(
             (flightplan: Flightplan) => {
@@ -202,7 +248,6 @@ export class PlannerComponent implements OnInit {
                     try {
                         let fp = new Flightplan(reader.result);
                         this.resetInputFileElement(this.mavlinkFileDialogElement.nativeElement, this._loadMavlinkLabel);
-                        console.log('Read flightplan (mavlink): ' + JSON.stringify(fp));
                         observer.next(fp);
                         observer.complete();
                     }
@@ -259,7 +304,6 @@ export class PlannerComponent implements OnInit {
                         let fp = new Flightplan();
                         fp.parseKmz(content, flightplanName, this._flightplanViewModel.selectedBearing, this._flightplanViewModel.selectedWaypointRadius);
                         this.resetInputFileElement(this.kmzFileDialogElement.nativeElement, this._loadKmzLabel);
-                        console.log('Read flightplan (kmz): ' + JSON.stringify(fp));
                         observer.next(fp);
                         observer.complete();
                     }
@@ -395,16 +439,38 @@ export class PlannerComponent implements OnInit {
         }
     }
 
-    saveFlightplan() {
+    saveFlightplanMavlink() {
         try {
             if (this._flightplan && this._flightplan.isValid) {
                 let blob = new Blob([this._flightplan.mavlink], { type: "text/plain;charset=utf-8" });
-                let currentdate = new Date();
                 let filename: string = this._flightplan.name + ".mavlink";
                 fileSaver.saveAs(blob, filename);
             }
             else {
                 this.showError('No mission loaded or no mavlink generated yet.');
+            }
+        }
+        catch (err) {
+            console.log(err);
+            this.showError(err);
+        }
+    }
+
+
+    private _name: string = '';
+    private _mavlink: string = '';
+    private _takeOffPosition: Waypoint = null;
+    private _touchDownPosition: Waypoint = null;
+
+    saveFlightplanJson() {
+        try {
+            if (this._flightplan && this._flightplan.isValid) {
+                let blob = new Blob([this._flightplan.toJson()], { type: "text/plain;charset=utf-8" });
+                let filename: string = this._flightplan.name + ".flightplan.json";
+                fileSaver.saveAs(blob, filename);
+            }
+            else {
+                this.showError('No flight plan created yet or current flight plan is invalid.');
             }
         }
         catch (err) {

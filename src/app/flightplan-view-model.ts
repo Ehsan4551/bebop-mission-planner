@@ -37,8 +37,8 @@ export class FlightplanViewModel {
     private _selectedWaypoint: Waypoint = null;
 
     // Points of interest
-    public newPointOfInterestLatitude: number = 47;
-    public newPointOfInterestLongitude: number = 8;
+    public newPointOfInterestLatitude: number = 0;
+    public newPointOfInterestLongitude: number = 0;
     private _pointsOfInterestMarkers: L.Marker[] = [];
     private _iconPointOfInterest = null;
     private _iconPointOfInterestHighlighted = null;
@@ -154,7 +154,7 @@ export class FlightplanViewModel {
                 else if (layer.tag === this._tagWaypointCircle) {
                     this.toggleEditWaypoint(layer.index);
                 }
-                else if (layer.tag == this._tagPointOfInterest) {
+                else if (layer.tag === this._tagPointOfInterest) {
                     this.toggleEditPointOfInterest(layer.index);
                 }
             }
@@ -183,6 +183,11 @@ export class FlightplanViewModel {
         this.redrawFlightplan();
         this.centerMapOnTakeoff();
         this.subscribeToFlightplanChanges();
+        // Initialize the default location where points of interest are added (TODO: put this somewhere suitable in a function).
+        if (this._flightplan) {
+            this.newPointOfInterestLatitude = this._flightplan.takeOffPosition.latitude;
+            this.newPointOfInterestLongitude = this._flightplan.takeOffPosition.longitude;
+        }
     }
 
     /**
@@ -657,6 +662,15 @@ export class FlightplanViewModel {
     updateSelectedPointOfInterest() {
         if (this._flightplan && this._selectedPointOfInterestIndex >= 0) {
             this._flightplan.setPointOfInterest(this._selectedPointOfInterest, this._selectedPointOfInterestIndex); // clones the point of interest and emits poi observable next.
+        }
+    }
+
+    removeSelectedPointOfInterest() {
+        if (this._flightplan && this._selectedPointOfInterestIndex >= 0) {
+            let index = this._selectedPointOfInterestIndex;
+            this._selectedPointOfInterestIndex = -1;
+            this._selectedPointOfInterest = null;
+            this._flightplan.removePointOfInterest(index); // emits point of interest observable next
         }
     }
 

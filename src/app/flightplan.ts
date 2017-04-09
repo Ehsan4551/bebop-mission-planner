@@ -130,7 +130,7 @@ export class Flightplan {
         if (this._takeOffPosition !== null && this._takeOffPosition.isValid &&
             this._touchDownPosition !== null && this._touchDownPosition.isValid &&
             this.waypoints.length >= 0 &&
-            this._mavlink !== '' &&
+            // this._mavlink !== '' &&
             this._name !== '') {
             let valid: boolean = true;
             for (let wp of this._waypoints) {
@@ -289,7 +289,6 @@ export class Flightplan {
         this._waypoints.forEach((wp) => {
             let bearing = geolib.getBearing(wp, center);
             wp.orientation = bearing;
-            console.log('Set bearing to: ' + bearing);
         });
         this._obsOnChange.next(); // notify about change
     }
@@ -346,7 +345,7 @@ export class Flightplan {
     }
 
     addPointOfInterest(p: L.LatLng): void {
-        if(p){
+        if (p) {
             this._pointsOfInterest.push(p);
             this._obsPointsOfInterest.next(this._pointsOfInterest);
         }
@@ -356,12 +355,27 @@ export class Flightplan {
     }
 
     /**
+     * Remove a point of interest.
+     * @param index the index of the point of interest to be removed.
+     */
+    removePointOfInterest(index: number): void {
+        if (index >= 0 && index < this._pointsOfInterest.length) {
+            console.log('lengthe before: ' + this._pointsOfInterest.length + ' index to remvoe: ' + index);
+            this._pointsOfInterest.splice(index, 1); // return array with 1 element removed at index
+            console.log('lengthe after: ' + this._pointsOfInterest.length);
+            this._obsPointsOfInterest.next(this._pointsOfInterest);
+        }
+        else {
+            throw new Error("Invalid point of interest index passed to removePointOfInterest()");
+        }
+    }
+
+    /**
      * Replace a specific point of interest.
      * Clones the point of interest.
      */
     setPointOfInterest(poi: L.LatLng, index: number) {
-        console.log('setPointOfInterest index: ' + index);
-        if (index >= 0 && index < this._pointsOfInterest.length) {
+        if (poi && index >= 0 && index < this._pointsOfInterest.length) {
             this._pointsOfInterest[index] = L.latLng(poi.lat, poi.lng);
             this._obsPointsOfInterest.next(this._pointsOfInterest);
         }
@@ -593,6 +607,53 @@ export class Flightplan {
             throw (err);
         }
         this._obsOnChange.next(); // notify about change
+    }
+
+    public toJson(): string {
+        let ser = {
+            "name": this.name,
+            "mavlink": this.mavlink,
+            "takeOffPosition": this.takeOffPosition,
+            "touchDownPosition": this.touchDownPosition,
+            "waypoints": this.waypoints,
+            "pointsOfInterest": this.pointsOfInterest
+        };
+        return JSON.stringify(ser, null, 4); // indent with 4 spaces
+    }
+
+    fromJson(json: string) {
+        this.clear();
+        let des = JSON.parse(json);
+        this._name = des.name;
+        this._mavlink = des.mavlink;
+        this._takeOffPosition = new Waypoint(
+            des.takeOffPosition.latitude,
+            des.takeOffPosition.longitude,
+            des.takeOffPosition.altitude,
+            des.takeOffPosition.orientation,
+            des.takeOffPosition.radius);
+        this._touchDownPosition = new Waypoint(
+            des.touchDownPosition.latitude,
+            des.touchDownPosition.longitude,
+            des.touchDownPosition.altitude,
+            des.touchDownPosition.orientation,
+            des.touchDownPosition.radius);
+        des.waypoints.forEach((wp) => {
+            this._waypoints.push(
+                new Waypoint(
+                    wp.latitude,
+                    wp.longitude,
+                    wp.altitude,
+                    wp.orientation,
+                    wp.radius
+                )
+            );
+        });
+        des.pointsOfInterest.forEach((poi) => {
+            this._pointsOfInterest.push(
+                L.latLng(poi.lat, poi.lng)
+            );
+        });
     }
 
 }
