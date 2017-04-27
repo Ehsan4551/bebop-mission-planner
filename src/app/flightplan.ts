@@ -177,11 +177,15 @@ export class Flightplan {
             mavlinkString += row + "\t0\t3\t16\t" + holdTimeAtWaypoint.toFixed(6) + "\t" + this.waypoints[i].radius.toFixed(6) + "\t0.000000\t" + this.waypoints[i].orientation.toFixed(6) + "\t" +
                 this.waypoints[i].latitude.toFixed(6) + "\t" + this.waypoints[i].longitude.toFixed(6) + "\t" + this.waypoints[i].altitude.toFixed(6) + "\t1\n";
             row = row + 1;
+            // Add an image recording command after each waypoint (TODO: 170425: counter-act unexplained sudden stops of recording)
+            mavlinkString += row + "\t0\t3\t2000\t" + captureInterval.toFixed(6) + "\t0.000000\t0.000108\t0.000000\t0.000000\t0.000000\t0.000000\t1\n";
+            row = row + 1;
         }
 
-        // Stop recording
-        mavlinkString += row + "\t0\t3\t2001\t0.000000\t0.000000\t0.000000\t0.000000\t0.000000\t0.000000\t0.000000\t1\n";
-        row = row + 1;
+        // Never stop recording (TODO: 170425: temporary to make sure camera isn't turned off)
+        // // Stop recording
+        // mavlinkString += row + "\t0\t3\t2001\t0.000000\t0.000000\t0.000000\t0.000000\t0.000000\t0.000000\t0.000000\t1\n";
+        // row = row + 1;
 
         // Landing
         mavlinkString += row + "\t0\t3\t21\t0.000000\t0.000000\t0.000000\t" + this._touchDownPosition.orientation.toFixed(6) + "\t" +
